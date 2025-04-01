@@ -1,3 +1,6 @@
+// assets/js/create-game.js
+// Logika za kreiranje nove igre
+
 // DOM Ready
 document.addEventListener('DOMContentLoaded', () => {
     console.log("Create Game stranica učitana");
@@ -180,49 +183,57 @@ function generateGameId() {
 function createGameInFirebase(gameId, user, roundTime, totalRounds, disabledLetters) {
     console.log("Kreiranje igre u Firebase-u:", gameId, user, roundTime, totalRounds, disabledLetters);
     
-    const gameRef = firebase.database().ref('games/' + gameId);
-    
-    // Game settings object
-    const gameSettings = {
-        roundTime: roundTime,
-        totalRounds: totalRounds,
-        disabledLetters: disabledLetters,
-        status: 'lobby',
-        createdAt: firebase.database.ServerValue.TIMESTAMP,
-        createdBy: user.username
-    };
-    
-    console.log("Postavke igre:", gameSettings);
-    
-    // Create the game
-    gameRef.set({
-        settings: gameSettings
-    }).then(() => {
-        console.log("Igra kreirana, dodavanje kreatora kao igrača...");
-        // Add the creator as a player
-        const playerId = generatePlayerId(user.username);
+    try {
+        const gameRef = firebase.database().ref('games/' + gameId);
         
-        const playerData = {
-            username: user.username,
-            isReady: false,
-            isFinished: false,
-            joinedAt: firebase.database.ServerValue.TIMESTAMP,
-            totalScore: 0,
-            isCreator: true
+        // Game settings object
+        const gameSettings = {
+            roundTime: roundTime,
+            totalRounds: totalRounds,
+            disabledLetters: disabledLetters,
+            status: 'lobby',
+            createdAt: firebase.database.ServerValue.TIMESTAMP,
+            createdBy: user.username
         };
         
-        return gameRef.child('players/' + playerId).set(playerData);
-    }).then(() => {
-        console.log("Kreator dodat kao igrač, spremanje gameId...");
-        // Store game ID
-        localStorage.setItem('zgGameId', gameId);
+        console.log("Postavke igre:", gameSettings);
         
-        // Show success modal
-        showGameCreatedModal(gameId);
-    }).catch(error => {
-        console.error('Error creating game:', error);
-        alert('Došlo je do greške pri kreiranju igre. Pokušajte ponovo.');
-    });
+        // Create the game
+        gameRef.set({
+            settings: gameSettings
+        })
+        .then(() => {
+            console.log("Igra kreirana, dodavanje kreatora kao igrača...");
+            // Add the creator as a player
+            const playerId = generatePlayerId(user.username);
+            
+            const playerData = {
+                username: user.username,
+                isReady: false,
+                isFinished: false,
+                joinedAt: firebase.database.ServerValue.TIMESTAMP,
+                totalScore: 0,
+                isCreator: true
+            };
+            
+            return gameRef.child('players/' + playerId).set(playerData);
+        })
+        .then(() => {
+            console.log("Kreator dodat kao igrač, spremanje gameId...");
+            // Store game ID
+            localStorage.setItem('zgGameId', gameId);
+            
+            // Show success modal
+            showGameCreatedModal(gameId);
+        })
+        .catch(error => {
+            console.error('Error creating game:', error);
+            alert('Došlo je do greške pri kreiranju igre. Pokušajte ponovo. Detalji: ' + error.message);
+        });
+    } catch (error) {
+        console.error('Exception in createGameInFirebase:', error);
+        alert('Došlo je do iznimke pri kreiranju igre. Pokušajte ponovo. Detalji: ' + error.message);
+    }
 }
 
 // Generate player ID based on username
@@ -235,17 +246,40 @@ function generatePlayerId(username) {
 
 // Show game created modal
 function showGameCreatedModal(gameId) {
-    const modal = new bootstrap.Modal(document.getElementById('gameCreatedModal'));
+    console.log("Prikazivanje modala s informacijama o igri:", gameId);
     
-    // Set game code in modal
-    document.getElementById('gameCodeDisplay').textContent = gameId;
-    
-    // Set game URL in modal
-    const gameUrl = window.location.origin + '/lobby.html?gameId=' + gameId;
-    document.getElementById('gameUrlInput').value = gameUrl;
-    
-    // Show modal
-    modal.show();
+    try {
+        // Set game code in modal
+        const gameCodeDisplay = document.getElementById('gameCodeDisplay');
+        if (gameCodeDisplay) {
+            gameCodeDisplay.textContent = gameId;
+        } else {
+            console.error('Element gameCodeDisplay nije pronađen!');
+        }
+        
+        // Set game URL in modal
+        const gameUrlInput = document.getElementById('gameUrlInput');
+        if (gameUrlInput) {
+            const gameUrl = window.location.origin + '/lobby.html?gameId=' + gameId;
+            gameUrlInput.value = gameUrl;
+        } else {
+            console.error('Element gameUrlInput nije pronađen!');
+        }
+        
+        // Show modal
+        const modalElement = document.getElementById('gameCreatedModal');
+        if (!modalElement) {
+            console.error('Modal element nije pronađen!');
+            return;
+        }
+        
+        const modal = new bootstrap.Modal(modalElement);
+        modal.show();
+        console.log("Modal prikazan uspješno");
+    } catch (error) {
+        console.error("Greška pri prikazivanju modala:", error);
+        alert("Igra je kreirana, ali je došlo do greške pri prikazivanju detalja. Kôd igre je: " + gameId);
+    }
 }
 
 // Copy text to clipboard
