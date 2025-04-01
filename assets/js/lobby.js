@@ -1,6 +1,6 @@
 // assets/js/lobby.js
 // Logika za lobby igre
-
+/*
 // Game and player data
 let gameData = null;
 let lobbyCurrUser  = null;
@@ -565,3 +565,4 @@ function showToast(message) {
     
     bsToast.show();
 }
+*/
