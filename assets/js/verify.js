@@ -11,6 +11,7 @@ let currentLetter = '';
 let totalRounds = 5;
 let allPlayersData = {};
 let verificationData = {};
+let isVerifier = false;
 
 // DOM Ready
 document.addEventListener('DOMContentLoaded', () => {
@@ -39,7 +40,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     verifyUser = JSON.parse(userJSON);
-    
     console.log("Korisnik za verifikaciju:", verifyUser.username);
     
     // Update round number display
@@ -126,11 +126,14 @@ function loadGameData(gameId) {
             // Get all players
             allPlayersData = gameData.players || {};
             
-            // Check if current user should be on the verification page
+            // Check if I should be the verifier
             checkVerifierStatus();
             
-            // Load answers for verification
-            loadAnswersForVerification();
+            // Set up real-time listeners for new answers
+            setupAnswersListener(gameId);
+            
+            // End the round when timer expires (if I'm the verifier)
+            setupTimerExpirationCheck(gameId);
         } else {
             // Round doesn't exist
             console.error("Runda ne postoji u podacima igre!");
@@ -145,33 +148,134 @@ function loadGameData(gameId) {
 
 // Check if the current user should be the verifier
 function checkVerifierStatus() {
-    if (!roundData || !roundData.verification) return;
-    
-    const verifierPlayerId = roundData.verification.verifiedBy;
-    
-    if (verifierPlayerId && verifierPlayerId !== currentPlayerId) {
-        console.log("This user is not the designated verifier, redirecting to results");
-        // Redirect to results page
-        window.location.href = `round-results.html?gameId=${gameData.id}&round=${currentRound}`;
+    // If verification node exists, check if I am the verifier
+    if (roundData.verification && roundData.verification.verifiedBy) {
+        const verifierPlayerId = roundData.verification.verifiedBy;
+        
+        if (verifierPlayerId !== currentPlayerId) {
+            console.log("This user is not the designated verifier, redirecting to results");
+            // Redirect to results page
+            window.location.href = `round-results.html?gameId=${gameData.id}&round=${currentRound}`;
+            return;
+        }
     } else {
-        console.log("User is the designated verifier");
+        // If verification node doesn't exist yet, check if I was first to finish
+        if (!roundData.answers) {
+            console.log("No answers yet, can't determine verifier");
+            window.location.href = `game-play.html?gameId=${gameData.id}`;
+            return;
+        }
+        
+        // Get all finished players and their finish times
+        const finishedPlayers = [];
+        for (const pid in roundData.answers) {
+            const playerAnswer = roundData.answers[pid];
+            if (playerAnswer && playerAnswer.isFinished && playerAnswer.finishedAt) {
+                finishedPlayers.push({
+                    id: pid,
+                    username: playerAnswer.username || "Unknown",
+                    finishedAt: playerAnswer.finishedAt
+                });
+            }
+        }
+        
+        // Sort by finish time (earliest first)
+        finishedPlayers.sort((a, b) => a.finishedAt - b.finishedAt);
+        
+        if (finishedPlayers.length > 0) {
+            const firstPlayer = finishedPlayers[0];
+            console.log("First player to finish:", firstPlayer.username);
+            
+            if (firstPlayer.id !== currentPlayerId) {
+                console.log("Not the first player, should not be verifying");
+                window.location.href = `round-results.html?gameId=${gameData.id}&round=${currentRound}`;
+                return;
+            } else {
+                // I am the first player, set myself as verifier if not already set
+                firebase.database().ref(`games/${gameData.id}/rounds/${currentRound}/verification`).update({
+                    verifiedBy: currentPlayerId,
+                    verificationStartedAt: firebase.database.ServerValue.TIMESTAMP
+                });
+            }
+        } else {
+            console.log("No finished players found");
+            window.location.href = `game-play.html?gameId=${gameData.id}`;
+            return;
+        }
+    }
+    
+    // If we get here, I am the verifier
+    isVerifier = true;
+    console.log("User is the designated verifier");
+    
+    // Load initial answers
+    loadAnswersForVerification();
+}
+
+// Setup a listener for new answers
+function setupAnswersListener(gameId) {
+    if (!isVerifier) return;
+    
+    const answersRef = firebase.database().ref(`games/${gameId}/rounds/${currentRound}/answers`);
+    
+    // Listen for any changes to answers
+    answersRef.on('value', (snapshot) => {
+        console.log("Answers updated, refreshing verification table");
+        loadAnswersForVerification();
+    });
+}
+
+// Setup a check for timer expiration
+function setupTimerExpirationCheck(gameId) {
+    if (!isVerifier) return;
+    
+    // Get round start time and time limit
+    const startedAt = roundData.startedAt;
+    const roundTimeInSeconds = gameData.settings.roundTime * 60;
+    
+    if (!startedAt) return;
+    
+    // Calculate when the round should end
+    const endTime = startedAt + (roundTimeInSeconds * 1000);
+    const now = Date.now();
+    
+    // If the round should have ended already, mark it as finished
+    if (now >= endTime && !roundData.finishedAt) {
+        console.log("Round time expired, marking as finished");
+        firebase.database().ref(`games/${gameData.id}/rounds/${currentRound}/finishedAt`).set(firebase.database.ServerValue.TIMESTAMP);
+    } else if (!roundData.finishedAt) {
+        // Set a timeout to end the round when the timer expires
+        const timeLeft = endTime - now;
+        console.log(`Round will auto-end in ${Math.floor(timeLeft/1000)} seconds`);
+        
+        setTimeout(() => {
+            console.log("Timer expired, checking if round is finished");
+            firebase.database().ref(`games/${gameData.id}/rounds/${currentRound}/finishedAt`).once('value', (snapshot) => {
+                if (!snapshot.exists() || !snapshot.val()) {
+                    console.log("Round not marked as finished yet, marking now");
+                    firebase.database().ref(`games/${gameData.id}/rounds/${currentRound}/finishedAt`).set(firebase.database.ServerValue.TIMESTAMP);
+                }
+            });
+        }, timeLeft);
     }
 }
 
 // Load answers for verification
 function loadAnswersForVerification() {
     console.log("Učitavanje odgovora za verifikaciju...");
-    if (!roundData || !roundData.answers) {
+    if (!roundData || !gameData.rounds || !gameData.rounds[currentRound] || !gameData.rounds[currentRound].answers) {
         console.error("Nema odgovora za verifikaciju!");
-        alert('Nema odgovora za verifikaciju.');
         return;
     }
     
-    const answers = roundData.answers;
-    console.log("Odgovori za verifikaciju:", answers);
-    
-    // Build verification table
-    buildVerificationTable(answers);
+    // Get fresh data
+    firebase.database().ref(`games/${gameData.id}/rounds/${currentRound}/answers`).once('value', (snapshot) => {
+        const answers = snapshot.val() || {};
+        console.log("Odgovori za verifikaciju:", answers);
+        
+        // Build verification table
+        buildVerificationTable(answers);
+    });
 }
 
 // Build verification table
@@ -267,7 +371,7 @@ function buildVerificationTable(answers) {
                 if (flagData) {
                     // Create a flag image and name
                     const flagContainer = document.createElement('div');
-                    flagContainer.className = 'd-flex align-items-center';
+                    flagContainer.className = 'flag-answer-container';
                     
                     const flagImg = document.createElement('img');
                     flagImg.src = `assets/flags/${answerValue.toLowerCase()}-flag.webp`;
@@ -277,6 +381,7 @@ function buildVerificationTable(answers) {
                     
                     const flagName = document.createElement('span');
                     flagName.textContent = flagData.name;
+                    flagName.className = 'answer-content';
                     
                     flagContainer.appendChild(flagImg);
                     flagContainer.appendChild(flagName);
@@ -290,7 +395,7 @@ function buildVerificationTable(answers) {
                 // Create a div for the answer content
                 const answerText = document.createElement('div');
                 answerText.textContent = answerValue;
-                answerText.style.display = 'inline-block';
+                answerText.className = 'answer-content';
                 answerCell.appendChild(answerText);
             }
             
@@ -298,7 +403,7 @@ function buildVerificationTable(answers) {
             if (answerValue.trim() !== '') {
                 // Create a container for the checkbox to control layout
                 const checkboxContainer = document.createElement('div');
-                checkboxContainer.className = 'd-inline-block ms-2';
+                checkboxContainer.className = 'd-inline-block';
                 
                 const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
@@ -329,6 +434,27 @@ function buildVerificationTable(answers) {
     });
     
     console.log("Tabela za verifikaciju izgrađena.");
+    
+    // Update confirm button text based on round status
+    updateConfirmButtonStatus();
+}
+
+// Update the confirm button status based on round status
+function updateConfirmButtonStatus() {
+    const confirmButton = document.getElementById('confirmVerificationBtn');
+    if (!confirmButton) return;
+    
+    // Check if round is finished
+    firebase.database().ref(`games/${gameData.id}/rounds/${currentRound}/finishedAt`).once('value', (snapshot) => {
+        const isFinished = snapshot.exists() && snapshot.val();
+        
+        if (isFinished) {
+            confirmButton.textContent = "Potvrdi i prikaži rezultate";
+            confirmButton.classList.add("pulse-animation");
+        } else {
+            confirmButton.textContent = "Potvrdi odgovore i sačekaj ostale igrače";
+        }
+    });
 }
 
 // Confirm verification and calculate scores
@@ -343,17 +469,49 @@ function confirmVerification() {
     const verificationRef = firebase.database().ref(`games/${gameData.id}/rounds/${currentRound}/verification`);
     
     // Set verification data
-    verificationRef.set({
+    verificationRef.update({
         verifiedBy: currentPlayerId,
         verifiedAt: firebase.database.ServerValue.TIMESTAMP,
         ...verificationData
     }).then(() => {
         console.log("Verifikacija uspešno sačuvana!");
-        // Calculate and save scores
-        calculateScores();
-    }).catch(error => {
+        
+        // Check if round is finished
+        return firebase.database().ref(`games/${gameData.id}/rounds/${currentRound}/finishedAt`).once('value');
+    })
+    .then((snapshot) => {
+        const isFinished = snapshot.exists() && snapshot.val();
+        
+        if (isFinished) {
+            // Round is finished, calculate scores and go to results
+            calculateScores();
+        } else {
+            // Round not finished yet, show message and disable button
+            const confirmButton = document.getElementById('confirmVerificationBtn');
+            if (confirmButton) {
+                confirmButton.disabled = true;
+                confirmButton.textContent = "Sačekaj da svi igrači završe...";
+            }
+            
+            showToast("Verifikacija sačuvana. Sačekaj da svi igrači završe ili da istekne vreme!");
+            
+            // Set up a listener for round finished status
+            listenForRoundFinished();
+        }
+    })
+    .catch(error => {
         console.error('Error saving verification:', error);
         alert('Došlo je do greške pri čuvanju verifikacije.');
+    });
+}
+
+// Listen for round finished status
+function listenForRoundFinished() {
+    firebase.database().ref(`games/${gameData.id}/rounds/${currentRound}/finishedAt`).on('value', (snapshot) => {
+        if (snapshot.exists() && snapshot.val()) {
+            console.log("Round is now finished, calculating scores");
+            calculateScores();
+        }
     });
 }
 
@@ -408,4 +566,45 @@ function updatePlayerTotalScore(playerId, roundScore) {
             });
         }
     });
+}
+
+// Show toast message
+function showToast(message) {
+    const toastContainer = document.querySelector('#toastContainer');
+    
+    if (!toastContainer) {
+        // Create toast container if it doesn't exist
+        const container = document.createElement('div');
+        container.id = 'toastContainer';
+        container.style.position = 'fixed';
+        container.style.bottom = '20px';
+        container.style.right = '20px';
+        container.style.zIndex = '1050';
+        document.body.appendChild(container);
+    }
+    
+    const toast = document.createElement('div');
+    toast.classList.add('toast', 'bg-dark-secondary', 'text-light', 'border-neon');
+    toast.setAttribute('role', 'alert');
+    toast.setAttribute('aria-live', 'assertive');
+    toast.setAttribute('aria-atomic', 'true');
+    
+    toast.innerHTML = `
+        <div class="toast-header bg-dark-secondary text-light">
+            <strong class="me-auto">Zanimljiva Geografija</strong>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Zatvori"></button>
+        </div>
+        <div class="toast-body">
+            ${message}
+        </div>
+    `;
+    
+    document.getElementById('toastContainer').appendChild(toast);
+    
+    const bsToast = new bootstrap.Toast(toast, {
+        autohide: true,
+        delay: 3000
+    });
+    
+    bsToast.show();
 }

@@ -373,8 +373,8 @@ function startTimer() {
             // Time's up
             clearInterval(timerInterval);
             
-            // Auto-submit answers
-            submitAnswers();
+            // Handle timer expiration
+            handleTimerExpired();
         }
     }, 1000);
     
@@ -382,21 +382,7 @@ function startTimer() {
     setTimeout(() => {
         if (!isRoundFinished) {
             console.log("Safety timeout triggered: force round completion");
-            submitAnswers(); // Force submission if not already submitted
-            
-            // Force check status of round after a short delay
-            setTimeout(() => {
-                firebase.database().ref(`games/${gameData.id}/rounds/${currentRound}/finishedAt`).once('value', (snapshot) => {
-                    if (!snapshot.exists() || !snapshot.val()) {
-                        firebase.database().ref(`games/${gameData.id}/rounds/${currentRound}/finishedAt`).set(firebase.database.ServerValue.TIMESTAMP)
-                            .then(() => {
-                                handleRoundFinished(null);
-                            });
-                    } else {
-                        handleRoundFinished(null);
-                    }
-                });
-            }, 2000);
+            handleTimerExpired();
         }
     }, (roundTimeInSeconds + 10) * 1000); // 10 seconds after round should end
 }
@@ -654,13 +640,21 @@ function submitAnswers() {
     
     console.log("Šaljem odgovore:", answers);
     
-    // Force an additional check for finishedAt timestamp after submission
-    const roundRef = firebase.database().ref(`games/${gameData.id}/rounds/${currentRound}`);
-    
     // Save answers to Firebase
     firebase.database().ref(`games/${gameData.id}/rounds/${currentRound}/answers/${currentPlayerId}`).update(answers)
         .then(() => {
             console.log("Odgovori uspešno poslati!");
+            
+            // Mark player as finished in player data
+            return firebase.database().ref(`games/${gameData.id}/players/${currentPlayerId}`).update({
+                isFinished: true,
+                lastActive: firebase.database.ServerValue.TIMESTAMP
+            });
+        })
+        .then(() => {
+            console.log("Igrač označen kao završen.");
+            isRoundFinished = true; // Mark as finished locally
+
             // Disable inputs
             disableAllInputs();
             
@@ -670,41 +664,119 @@ function submitAnswers() {
             // Show submitted message
             showToast('Odgovori su uspešno poslati!');
             
-            // Mark player as finished in player data
-            firebase.database().ref(`games/${gameData.id}/players/${currentPlayerId}`).update({
-                isFinished: true,
-                lastActive: firebase.database.ServerValue.TIMESTAMP
-            })
-            .then(() => {
-                console.log("Igrač označen kao završen.");
-                
-                // Check if all players finished
-                checkAllPlayersFinished();
-                
-                // Add safety timeout to check round status again
-                setTimeout(() => {
-                    roundRef.once('value', (snapshot) => {
-                        const roundData = snapshot.val();
-                        if (roundData && !roundData.finishedAt && isRoundFinished) {
-                            console.log("Safety check: Force setting finishedAt for round");
-                            roundRef.update({
-                                finishedAt: firebase.database.ServerValue.TIMESTAMP
-                            }).then(() => {
-                                console.log("Force finished round");
-                                handleRoundFinished(roundData);
-                            });
-                        }
-                    });
-                }, 3000); // Check after 3 seconds
-            })
-            .catch(error => {
-                console.error("Greška pri označavanju igrača kao završenog:", error);
-            });
+            // Check if this player was first to finish
+            checkIfFirstToFinish();
         })
         .catch(error => {
             console.error('Error submitting answers:', error);
             showToast('Došlo je do greške pri slanju odgovora. Pokušajte ponovo.');
         });
+}
+
+function checkIfFirstToFinish() {
+    console.log("Checking if first player to finish...");
+    const answersRef = firebase.database().ref(`games/${gameData.id}/rounds/${currentRound}/answers`);
+    
+    answersRef.once('value', (snapshot) => {
+        const answers = snapshot.val() || {};
+        
+        // Get all finished players and their finish times
+        const finishedPlayers = [];
+        for (const pid in answers) {
+            if (answers[pid] && answers[pid].isFinished && answers[pid].finishedAt) {
+                finishedPlayers.push({
+                    id: pid,
+                    username: answers[pid].username || "Unknown",
+                    finishedAt: answers[pid].finishedAt
+                });
+            }
+        }
+        
+        // Sort by finish time (earliest first)
+        finishedPlayers.sort((a, b) => a.finishedAt - b.finishedAt);
+        
+        if (finishedPlayers.length > 0) {
+            const firstPlayer = finishedPlayers[0];
+            console.log("First player to finish:", firstPlayer.username);
+            
+            if (firstPlayer.id === currentPlayerId) {
+                console.log("I am the first player - becoming verifier");
+                
+                // Set myself as verifier
+                firebase.database().ref(`games/${gameData.id}/rounds/${currentRound}/verification`).update({
+                    verifiedBy: currentPlayerId,
+                    verificationStartedAt: firebase.database.ServerValue.TIMESTAMP
+                })
+                .then(() => {
+                    console.log("Set as verifier, going to verification page");
+                    redirectWithDelay('verify.html?gameId=' + gameData.id + '&round=' + currentRound, 500);
+                })
+                .catch(error => {
+                    console.error("Error setting verifier:", error);
+                });
+            } else {
+                console.log("Not the first player, waiting for round to end");
+                showToast("Waiting for round to end...");
+                
+                // Listen for round finished status
+                setupRoundFinishedListener();
+            }
+        }
+    });
+}
+
+// When the timer runs out, this function handles the force-finish for all players
+function handleTimerExpired() {
+    console.log("Timer expired, forcing round completion");
+    
+    // Check if the round is already marked as finished
+    firebase.database().ref(`games/${gameData.id}/rounds/${currentRound}/finishedAt`).once('value', (snapshot) => {
+        if (!snapshot.exists() || !snapshot.val()) {
+            // Round not finished yet, mark it as finished
+            firebase.database().ref(`games/${gameData.id}/rounds/${currentRound}/finishedAt`).set(firebase.database.ServerValue.TIMESTAMP)
+                .then(() => {
+                    console.log("Round marked as finished");
+                    
+                    // If this player hasn't submitted answers yet, auto-submit
+                    if (!isRoundFinished) {
+                        submitAnswers();
+                    } else {
+                        // Already finished, redirect to appropriate page
+                        redirectToAppropriatePageBasedOnRole();
+                    }
+                });
+        }
+    });
+}
+
+// Helper function to redirect based on player role
+function redirectToAppropriatePageBasedOnRole() {
+    // Check if I am the verifier
+    firebase.database().ref(`games/${gameData.id}/rounds/${currentRound}/verification/verifiedBy`).once('value', (snapshot) => {
+        const verifierId = snapshot.val();
+        
+        if (verifierId === currentPlayerId) {
+            // I am the verifier, go to verify page
+            redirectWithDelay('verify.html?gameId=' + gameData.id + '&round=' + currentRound, 500);
+        } else {
+            // I am not the verifier, go to results page
+            redirectWithDelay('round-results.html?gameId=' + gameData.id + '&round=' + currentRound, 500);
+        }
+    });
+}
+
+
+
+// New function to set up a listener for when the round is finished
+function setupRoundFinishedListener() {
+    console.log("Setting up round finished listener");
+    
+    firebase.database().ref(`games/${gameData.id}/rounds/${currentRound}/finishedAt`).on('value', (snapshot) => {
+        if (snapshot.exists() && snapshot.val()) {
+            console.log("Round is now finished, redirecting to results");
+            redirectWithDelay('round-results.html?gameId=' + gameData.id + '&round=' + currentRound, 500);
+        }
+    });
 }
 
 // Disable all inputs after submission
