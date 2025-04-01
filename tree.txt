@@ -1,0 +1,27 @@
+zanimljiva-geografija/
+├── assets/
+│   ├── css/
+│   │   ├── style.css
+│   │   └── bootstrap.min.css
+│   ├── js/
+│   │   ├── main.js
+│   │   ├── firebase-config.js
+│   │   ├── game.js
+│   │   └── lobby.js
+│   ├── flags/
+│   │   └── [195 GIF files]
+│   ├── sounds/
+│   │   ├── countdown.mp3
+│   │   ├── correct.mp3
+│   │   └── victory.mp3
+│   └── fonts/
+│       ├── roboto/
+│       └── montserrat/
+├── index.html
+├── create-game.html
+├── lobby.html
+├── game.html
+├── verify.html
+├── round-results.html
+├── final-results.html
+└── README.md
