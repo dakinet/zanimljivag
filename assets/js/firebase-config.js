@@ -16,6 +16,17 @@ const firebaseConfig = {
 // Initialize Firebase
 firebase.initializeApp(firebaseConfig);
 
+// Test database connection
+console.log("Testiranje veze s Firebase Realtime Database...");
+const testRef = firebase.database().ref(".info/connected");
+testRef.on("value", (snap) => {
+  if (snap.val() === true) {
+    console.log("Povezan s Firebase Database!");
+  } else {
+    console.log("Nije uspjela veza s Firebase Database.");
+  }
+});
+
 // Initialize Authentication
 const auth = firebase.auth();
 
@@ -46,4 +57,26 @@ auth.onAuthStateChanged((user) => {
 // Call to initialize anonymous auth when page loads
 document.addEventListener('DOMContentLoaded', () => {
   initAnonymousAuth();
+  
+  // Test database write/read
+  setTimeout(() => {
+    console.log("Testiranje pisanja u Firebase Database...");
+    const testWriteRef = firebase.database().ref("test_connection");
+    testWriteRef.set({
+      timestamp: firebase.database.ServerValue.TIMESTAMP,
+      message: "Test connection"
+    })
+    .then(() => {
+      console.log("Uspješno zapisivanje u bazu!");
+      
+      // Read back the test data
+      return testWriteRef.once("value");
+    })
+    .then((snapshot) => {
+      console.log("Uspješno čitanje iz baze:", snapshot.val());
+    })
+    .catch((error) => {
+      console.error("Greška pri testiranju baze:", error);
+    });
+  }, 2000);
 });
