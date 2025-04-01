@@ -3,7 +3,7 @@
 
 // Game and player data
 let gameData = null;
-let currentUser = null;
+let lobbyCurrUser  = null;
 let currentPlayerId = null;
 let countdownInterval = null;
 let playersData = {};
