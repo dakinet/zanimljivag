@@ -15,9 +15,13 @@ let allPlayersData = {};
 
 // DOM Ready
 document.addEventListener('DOMContentLoaded', () => {
+    console.log("Game.js učitan!");
+    
     // Get game ID from URL or localStorage
     const urlParams = new URLSearchParams(window.location.search);
     const gameId = urlParams.get('gameId') || localStorage.getItem('zgGameId');
+    
+    console.log("Game ID:", gameId);
     
     if (!gameId) {
         // No game ID, redirect to home
@@ -36,6 +40,8 @@ document.addEventListener('DOMContentLoaded', () => {
     
     lobbyCurrentUser = JSON.parse(userJSON);
     currentPlayerId = generatePlayerId(lobbyCurrentUser.username);
+    
+    console.log("Current User:", lobbyCurrentUser.username, "ID:", currentPlayerId);
     
     // Initialize category inputs
     initializeCategoryInputs();
@@ -94,6 +100,7 @@ function setupEventListeners() {
 
 // Load game data
 function loadGameData(gameId) {
+    console.log("Učitavam podatke o igri...");
     const gameRef = firebase.database().ref('games/' + gameId);
     
     // Check if game exists
@@ -107,6 +114,8 @@ function loadGameData(gameId) {
         
         gameData = snapshot.val();
         gameData.id = gameId;
+        
+        console.log("Podaci o igri učitani:", gameData);
         
         // Get game settings
         const settings = gameData.settings;
@@ -146,6 +155,7 @@ function getCurrentRound() {
     }
     
     currentRound = highestRoundNumber || 1;
+    console.log("Trenutna runda:", currentRound);
     
     // Update UI
     document.getElementById('roundNumber').textContent = currentRound;
@@ -165,6 +175,7 @@ function getCurrentRound() {
 
 // Setup real-time listeners
 function setupRealtimeListeners(gameId) {
+    console.log("Postavljam real-time listenere...");
     const gameRef = firebase.database().ref('games/' + gameId);
     
     // Listen for round changes
@@ -178,6 +189,12 @@ function setupRealtimeListeners(gameId) {
             
             // Update placeholders for inputs
             updateInputPlaceholders();
+            
+            // Proveravamo da li je runda već završena
+            if (roundData.finishedAt && !isRoundFinished) {
+                console.log("Detektovano da je runda završena!");
+                handleRoundFinished(roundData);
+            }
         }
     });
     
@@ -208,84 +225,98 @@ function setupRealtimeListeners(gameId) {
         }
     });
     
-    // Listen for round finished status
+    // Listen specifically for round finished status
     gameRef.child('rounds/' + currentRound + '/finishedAt').on('value', (snapshot) => {
-        const finishedAt = snapshot.val();
-        
-        if (finishedAt) {
-            // Round has finished
-            clearInterval(timerInterval);
-            console.log("Runda je završena, proveravam ko ide na verifikaciju");
-            
-            // Redirect to verification page if first to finish
-            gameRef.child('rounds/' + currentRound + '/answers').once('value', (answersSnapshot) => {
-                const answers = answersSnapshot.val() || {};
-                
-                // Get finished players sorted by finish time
-                const finishedPlayers = [];
-                for (const pid in answers) {
-                    if (answers[pid] && answers[pid].isFinished) {
-                        finishedPlayers.push({
-                            id: pid,
-                            username: answers[pid].username || allPlayersData[pid]?.username || "Unknown",
-                            finishedAt: answers[pid].finishedAt || 0
-                        });
-                    }
-                }
-                
-                // Sort by finish time (earliest first)
-                finishedPlayers.sort((a, b) => (a.finishedAt || 0) - (b.finishedAt || 0));
-                
-                console.log("Sortirani igrači prema vremenu završetka:", finishedPlayers);
-                console.log("Trenutni igrač ID:", currentPlayerId);
-                
-                // Ako već postoji verifier, ne raditi ništa - verifikacija je u toku
-                gameRef.child('rounds/' + currentRound + '/verification/verifiedBy').once('value', (verifierSnapshot) => {
-                    const verifier = verifierSnapshot.val();
-                    
-                    if (verifier) {
-                        console.log("Verifikacija je već u toku od strane:", verifier);
-                        // Ako nismo mi verifier, idemo na results stranicu
-                        if (verifier !== currentPlayerId) {
-                            setTimeout(() => {
-                                window.location.href = 'round-results.html?gameId=' + gameData.id + '&round=' + currentRound;
-                            }, 1000);
-                        }
-                        return;
-                    }
-                    
-                    // Ako nema verifier-a još uvek
-                    if (finishedPlayers.length > 0) {
-                        // Set verifier to be the first player who finished
-                        const firstPlayer = finishedPlayers[0];
-                        console.log("Prvi igrač koji je završio:", firstPlayer);
-                        
-                        // Set verification info
-                        gameRef.child('rounds/' + currentRound + '/verification/verifiedBy').set(firstPlayer.id)
-                            .then(() => {
-                                // Check if current player is first to finish
-                                if (firstPlayer.id === currentPlayerId) {
-                                    console.log("Ja sam prvi igrač, idem na verifikaciju");
-                                    // This player finished first, go to verification
-                                    setTimeout(() => {
-                                        window.location.href = 'verify.html?gameId=' + gameData.id + '&round=' + currentRound;
-                                    }, 1000);
-                                } else {
-                                    console.log("Nisam prvi igrač, čekam rezultate");
-                                    // Wait for verification
-                                    setTimeout(() => {
-                                        window.location.href = 'round-results.html?gameId=' + gameData.id + '&round=' + currentRound;
-                                    }, 1000);
-                                }
-                            })
-                            .catch(error => {
-                                console.error("Greška pri postavljanju verifikatora:", error);
-                            });
-                    }
-                });
-            });
+        if (snapshot.exists() && snapshot.val()) {
+            console.log("Runda je završena, finishedAt:", snapshot.val());
+            handleRoundFinished(null);
         }
     });
+}
+
+// Handle round finished event
+function handleRoundFinished(roundData) {
+    // Stop timer
+    clearInterval(timerInterval);
+    console.log("Runda je završena, proveravam ko ide na verifikaciju");
+    
+    // Get game reference
+    const gameRef = firebase.database().ref('games/' + gameData.id);
+    
+    // Get all answers
+    gameRef.child('rounds/' + currentRound + '/answers').once('value', (answersSnapshot) => {
+        const answers = answersSnapshot.val() || {};
+        
+        // Get finished players sorted by finish time
+        const finishedPlayers = [];
+        for (const pid in answers) {
+            if (answers[pid] && answers[pid].isFinished) {
+                finishedPlayers.push({
+                    id: pid,
+                    username: answers[pid].username || (allPlayersData[pid] ? allPlayersData[pid].username : "Unknown"),
+                    finishedAt: answers[pid].finishedAt || 0
+                });
+            }
+        }
+        
+        // Sort by finish time (earliest first)
+        finishedPlayers.sort((a, b) => (a.finishedAt || 0) - (b.finishedAt || 0));
+        
+        console.log("Sortirani igrači prema vremenu završetka:", finishedPlayers);
+        console.log("Trenutni igrač ID:", currentPlayerId);
+        
+        // Check if verification is already in progress
+        gameRef.child('rounds/' + currentRound + '/verification/verifiedBy').once('value', (verifierSnapshot) => {
+            const verifier = verifierSnapshot.val();
+            
+            if (verifier) {
+                console.log("Verifikator već postoji:", verifier);
+                
+                // If current user is verifier
+                if (verifier === currentPlayerId) {
+                    console.log("Ja sam verifikator, idem na verify.html");
+                    redirectWithDelay('verify.html?gameId=' + gameData.id + '&round=' + currentRound, 500);
+                } else {
+                    console.log("Nisam verifikator, idem na round-results.html");
+                    redirectWithDelay('round-results.html?gameId=' + gameData.id + '&round=' + currentRound, 500);
+                }
+            } else if (finishedPlayers.length > 0) {
+                // Set first player as verifier
+                const firstPlayer = finishedPlayers[0];
+                console.log("Prvi završio:", firstPlayer.username);
+                
+                gameRef.child('rounds/' + currentRound + '/verification').update({
+                    verifiedBy: firstPlayer.id,
+                    verificationStartedAt: firebase.database.ServerValue.TIMESTAMP
+                })
+                .then(() => {
+                    if (firstPlayer.id === currentPlayerId) {
+                        console.log("Ja sam prvi, idem na verifikaciju");
+                        redirectWithDelay('verify.html?gameId=' + gameData.id + '&round=' + currentRound, 500);
+                    } else {
+                        console.log("Nisam prvi, idem na rezultate");
+                        redirectWithDelay('round-results.html?gameId=' + gameData.id + '&round=' + currentRound, 500);
+                    }
+                })
+                .catch(error => {
+                    console.error("Greška pri postavljanju verifikatora:", error);
+                    // In case of error, go to results page
+                    redirectWithDelay('round-results.html?gameId=' + gameData.id + '&round=' + currentRound, 500);
+                });
+            } else {
+                console.log("Nema završenih igrača!?");
+                redirectWithDelay('round-results.html?gameId=' + gameData.id + '&round=' + currentRound, 500);
+            }
+        });
+    });
+}
+
+// Helper function for delayed redirect
+function redirectWithDelay(url, delay) {
+    console.log(`Redirecting to ${url} in ${delay}ms`);
+    setTimeout(() => {
+        window.location.href = url;
+    }, delay);
 }
 
 // Start the round timer
@@ -338,6 +369,8 @@ function updateTimerDisplay(seconds) {
 
 // Load flags data
 function loadFlags() {
+    console.log("Učitavanje zastava...");
+    
     // Inicijalizacija handlera za zastave sa podacima
     if (typeof flagsData !== 'undefined' && typeof FlagHandler !== 'undefined') {
         // Inicijalizacija FlagHandler-a sa podacima zastava
@@ -352,12 +385,17 @@ function loadFlags() {
             // Dodaj sve zastave u grid
             Object.values(flagsData).forEach(flag => {
                 const flagImg = document.createElement('img');
-                flagImg.src = `assets/flags/${flag.code.toLowerCase()}-flag.webpf`;
-                flagImg.alt = flag.name; 
-                // Uklanjamo title atribut da se ne bi prikazivao tooltip
-                // flagImg.title = flag.name;  
+                // Koristimo ispravan format fajla - WEBP, bez dodatnog 'f' na kraju
+                flagImg.src = `assets/flags/${flag.code.toLowerCase()}-flag.webp`;
+                flagImg.alt = flag.name;
                 flagImg.className = 'flag-item';
                 flagImg.dataset.code = flag.code;
+                
+                // Na greški, prikaži placeholder
+                flagImg.onerror = function() {
+                    console.log("Nije moguće učitati zastavu:", flag.code);
+                    this.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="60" height="40" viewBox="0 0 60 40"><rect width="60" height="40" fill="%23ccc"/><text x="50%" y="50%" font-family="Arial" font-size="12" text-anchor="middle" dominant-baseline="middle" fill="%23666">' + flag.code + '</text></svg>';
+                };
                 
                 // Dodaj event listener za klik
                 flagImg.addEventListener('click', function() {
@@ -459,14 +497,21 @@ function updatePlayersProgress() {
     // Get all players
     const players = [];
     for (const playerId in allPlayersData) {
-        players.push({
-            id: playerId,
-            ...allPlayersData[playerId]
-        });
+        if (allPlayersData[playerId] && allPlayersData[playerId].username) {
+            players.push({
+                id: playerId,
+                username: allPlayersData[playerId].username || "Nepoznat",
+                ...allPlayersData[playerId]
+            });
+        }
     }
     
-    // Sort players by name
-    players.sort((a, b) => a.username.localeCompare(b.username));
+    // Sort players by name (safe version)
+    try {
+        players.sort((a, b) => String(a.username || "").localeCompare(String(b.username || "")));
+    } catch (e) {
+        console.error("Greška pri sortiranju igrača:", e);
+    }
     
     // Add progress for each player
     players.forEach(player => {
@@ -488,7 +533,7 @@ function updatePlayersProgress() {
         // Player name
         const playerName = document.createElement('div');
         playerName.className = 'player-name';
-        playerName.textContent = player.username;
+        playerName.textContent = player.username || "Igrač";
         
         // Add to container
         playerEl.appendChild(playerName);
@@ -519,7 +564,10 @@ function navigateCategory(direction) {
 
 // Submit player answers
 function submitAnswers() {
-    if (isRoundFinished) return; // Prevent multiple submissions
+    if (isRoundFinished) {
+        console.log("Već ste završili rundu!");
+        return; // Prevent multiple submissions
+    }
     
     // Get the selected flag code
     let selectedFlagCode = null;
@@ -545,6 +593,8 @@ function submitAnswers() {
         username: lobbyCurrentUser.username // Dodajemo username u odgovore za lakšu identifikaciju
     };
     
+    console.log("Šaljem odgovore:", answers);
+    
     // Save answers to Firebase
     firebase.database().ref(`games/${gameData.id}/rounds/${currentRound}/answers/${currentPlayerId}`).update(answers)
         .then(() => {
@@ -559,10 +609,19 @@ function submitAnswers() {
             showToast('Odgovori su uspešno poslati!');
             
             // Mark player as finished in player data
-            firebase.database().ref(`games/${gameData.id}/players/${currentPlayerId}/isFinished`).set(true);
-            
-            // Check if all players finished
-            checkAllPlayersFinished();
+            firebase.database().ref(`games/${gameData.id}/players/${currentPlayerId}`).update({
+                isFinished: true,
+                lastActive: firebase.database.ServerValue.TIMESTAMP
+            })
+            .then(() => {
+                console.log("Igrač označen kao završen.");
+                
+                // Check if all players finished
+                checkAllPlayersFinished();
+            })
+            .catch(error => {
+                console.error("Greška pri označavanju igrača kao završenog:", error);
+            });
         })
         .catch(error => {
             console.error('Error submitting answers:', error);
@@ -589,33 +648,68 @@ function disableAllInputs() {
     });
     
     // Disable submit button
-    document.getElementById('submitAnswersBtn').disabled = true;
+    const submitBtn = document.getElementById('submitAnswersBtn');
+    if (submitBtn) {
+        submitBtn.disabled = true;
+    }
 }
 
 // Check if all players have finished
 function checkAllPlayersFinished() {
-    if (!gameData || !gameData.rounds || !gameData.rounds[currentRound]) return;
+    if (!gameData || !gameData.rounds || !gameData.rounds[currentRound]) {
+        console.log("Nema podataka o rundi");
+        return;
+    }
     
     const answers = gameData.rounds[currentRound].answers || {};
     
-    // Get all player IDs
-    const playerIds = Object.keys(allPlayersData);
-    
-    // Count finished players
-    let finishedPlayers = 0;
-    for (const playerId in answers) {
-        if (answers[playerId] && answers[playerId].isFinished) {
-            finishedPlayers++;
+    // Get all ACTIVE player IDs
+    const playerIds = [];
+    for (const playerId in allPlayersData) {
+        // Proveri da li je igrač aktivan u igri
+        if (allPlayersData[playerId] && !allPlayersData[playerId].isDisconnected) {
+            playerIds.push(playerId);
         }
     }
     
-    console.log(`Finished players: ${finishedPlayers}/${playerIds.length}`);
+    if (playerIds.length === 0) {
+        console.log("Nema aktivnih igrača");
+        return;
+    }
     
-    // If all players finished, end round
+    console.log("Aktivni igrači:", playerIds);
+    
+    // Count finished players
+    let finishedPlayers = 0;
+    const finishedPlayerIds = [];
+    
+    for (const playerId of playerIds) {
+        if (answers[playerId] && answers[playerId].isFinished === true) {
+            finishedPlayers++;
+            finishedPlayerIds.push(playerId);
+        }
+    }
+    
+    console.log(`Finished players: ${finishedPlayers}/${playerIds.length}`, finishedPlayerIds);
+    
+    // If all ACTIVE players finished, end round
     if (finishedPlayers >= playerIds.length && playerIds.length > 0) {
-        console.log("All players finished, setting finishedAt timestamp");
-        // Update round finish time
-        firebase.database().ref(`games/${gameData.id}/rounds/${currentRound}/finishedAt`).set(firebase.database.ServerValue.TIMESTAMP);
+        console.log("Svi igrači su završili, postavlja se finishedAt timestamp");
+        
+        // Update round finish time ONLY if not already set
+        firebase.database().ref(`games/${gameData.id}/rounds/${currentRound}/finishedAt`).once('value', (snapshot) => {
+            if (!snapshot.exists() || !snapshot.val()) {
+                firebase.database().ref(`games/${gameData.id}/rounds/${currentRound}/finishedAt`).set(firebase.database.ServerValue.TIMESTAMP)
+                    .then(() => {
+                        console.log("FinishedAt uspešno postavljen");
+                    })
+                    .catch(error => {
+                        console.error("Greška pri postavljanju finishedAt:", error);
+                    });
+            } else {
+                console.log("finishedAt je već postavljen, ne postavljamo ga ponovo");
+            }
+        });
     }
 }
 
