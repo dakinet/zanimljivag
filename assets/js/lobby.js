@@ -7,7 +7,7 @@ let lobbyCurrUser  = null;
 let currentPlayerId = null;
 let countdownInterval = null;
 let playersData = {};
-//let currentGameId = null;
+let lobbyGameId = null;
 
 // DOM Ready
 document.addEventListener('DOMContentLoaded', () => {
@@ -27,11 +27,11 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Get game ID from URL or localStorage
     const urlParams = new URLSearchParams(window.location.search);
-    currentGameId = urlParams.get('gameId') || localStorage.getItem('zgGameId');
+    lobbyGameId = urlParams.get('gameId') || localStorage.getItem('zgGameId');
     
-    console.log("Dobijen gameId iz URL-a ili localStorage:", currentGameId);
+    console.log("Dobijen gameId iz URL-a ili localStorage:", lobbyGameId);
     
-    if (!currentGameId) {
+    if (!lobbyGameId) {
         // No game ID, redirect to home
         console.error("Nedostaje gameId, preusmeravanje na početnu stranicu");
         window.location.href = 'index.html';
@@ -41,8 +41,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Display game ID
     const gameIdElement = document.getElementById('gameId');
     if (gameIdElement) {
-        gameIdElement.textContent = currentGameId;
-        console.log("Prikazan gameId na stranici:", currentGameId);
+        gameIdElement.textContent = lobbyGameId;
+        console.log("Prikazan gameId na stranici:", lobbyGameId);
     } else {
         console.error("Element za prikaz ID igre nije pronađen!");
     }
@@ -64,7 +64,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
     
     // Load game data
-    loadGameData(currentGameId);
+    loadGameData(lobbyGameId);
 });
 
 // Setup event listeners
