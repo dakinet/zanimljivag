@@ -35,16 +35,12 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
     
-    resultsUser  = JSON.parse(userJSON);
-    currentPlayerId = generatePlayerId(currentUser.username);
-    
-    // Update round number display
-    document.getElementById('roundNumber').textContent = currentRound;
+    resultsUser = JSON.parse(userJSON); // Using resultsUser instead of currentUser
     
     // Setup event listeners
     setupEventListeners();
     
-    // Load game data
+    // Load game data - this will set the currentPlayerId
     loadGameData(gameId);
 });
 
@@ -89,8 +85,6 @@ function loadGameData(gameId) {
         gameData = snapshot.val();
         gameData.id = gameId;
         
-        console.log("Game data loaded:", gameData);
-        
         // Find the current player ID from existing data
         if (gameData.players) {
             for (const pid in gameData.players) {
@@ -133,7 +127,6 @@ function loadGameData(gameId) {
             startNextRoundCountdown();
         } else {
             // Round doesn't exist
-            console.error("Round doesn't exist in game data!");
             alert('Runda ne postoji.');
             window.location.href = 'index.html';
         }

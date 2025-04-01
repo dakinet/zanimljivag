@@ -39,7 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     verifyUser = JSON.parse(userJSON);
-    currentPlayerId = generatePlayerId(verifyUser.username);
+    currentPlayerId = null;
     
     console.log("Korisnik za verifikaciju:", verifyUser.username, "ID:", currentPlayerId);
     

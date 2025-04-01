@@ -104,6 +104,7 @@ function generatePlayerId(username) {
 }
 
 // Load game data
+// In lobby.js, update the loadGameData function:
 function loadGameData(gameId) {
     console.log("Učitavanje podataka igre sa ID:", gameId);
     const gameRef = firebase.database().ref('games/' + gameId);
@@ -122,12 +123,21 @@ function loadGameData(gameId) {
         gameData.id = gameId;
         console.log("Podaci igre učitani:", gameData);
         
+        // Store original username for consistent reference
+        const originalUsername = currentUser.username;
+        console.log("Original username:", originalUsername);
+        
         // Check if player is already in the game
         let playerExists = false;
         if (gameData.players) {
             console.log("Lista igrača u igri:", gameData.players);
+            
+            // IMPORTANT: Only match the exact username, don't look at other properties
             for (const playerId in gameData.players) {
-                if (gameData.players[playerId].username === currentUser.username) {
+                const playerUsername = gameData.players[playerId].username;
+                console.log("Checking player:", playerId, "with username:", playerUsername);
+                
+                if (playerUsername === originalUsername) {
                     currentPlayerId = playerId;
                     playerExists = true;
                     console.log("Korisnik već postoji u igri, ID:", playerId);
@@ -142,6 +152,23 @@ function loadGameData(gameId) {
             // Add player to game
             console.log("Dodavanje igrača u igru...");
             addPlayerToGame(gameId, currentUser);
+        } else {
+            // Ensure our ready status is correctly displayed in UI
+            const readyBtn = document.getElementById('readyBtn');
+            if (readyBtn && gameData.players[currentPlayerId]) {
+                const isReady = gameData.players[currentPlayerId].isReady;
+                
+                // Update button state
+                if (isReady) {
+                    readyBtn.classList.add('ready', 'btn-success');
+                    readyBtn.classList.remove('btn-outline-success');
+                    readyBtn.innerHTML = '<i class="fas fa-check-circle me-2"></i>Spreman!';
+                } else {
+                    readyBtn.classList.remove('ready', 'btn-success');
+                    readyBtn.classList.add('btn-outline-success');
+                    readyBtn.innerHTML = '<i class="fas fa-check-circle me-2"></i>Spremi se';
+                }
+            }
         }
         
         // Display game settings
@@ -169,7 +196,7 @@ function addPlayerToGame(gameId, user) {
     const playerRef = firebase.database().ref('games/' + gameId + '/players/' + currentPlayerId);
     
     const playerData = {
-        username: user.username,
+        username: user.username, // IMPORTANT: Store the exact username
         isReady: false,
         isFinished: false,
         joinedAt: firebase.database.ServerValue.TIMESTAMP,
@@ -270,7 +297,16 @@ function updatePlayersList() {
     playersList.innerHTML = '';
     
     // Count players
-    const players = Object.values(playersData);
+    const players = [];
+    for (const playerId in playersData) {
+        if (playersData[playerId] && playersData[playerId].username) {
+            players.push({
+                id: playerId,
+                ...playersData[playerId]
+            });
+        }
+    }
+    
     console.log("Ažuriranje liste igrača, pronađeno:", players.length, "igrača");
     console.log("Podaci o igračima:", playersData);
     playerCount.textContent = players.length + '/10';
@@ -287,6 +323,7 @@ function updatePlayersList() {
     // Add each player to the list
     players.forEach(player => {
         console.log("Dodajem igrača u listu:", player.username, "spreman:", player.isReady);
+        
         // Create player progress element
         const playerItem = document.createElement('div');
         playerItem.className = 'd-flex justify-content-between align-items-center mb-2';
@@ -323,16 +360,20 @@ function updatePlayersList() {
         playersList.appendChild(playerItem);
         
         // Highlight current player
-        if (player.username === currentUser.username) {
+        if (player.id === currentPlayerId) {
             playerItem.classList.add('current-player');
             playerItem.style.backgroundColor = 'rgba(0, 255, 204, 0.1)';
             playerItem.style.borderLeft = '3px solid var(--accent-teal)';
             playerItem.style.paddingLeft = '5px';
         }
     });
+    
+    // Check if all players are ready to start the game
+    checkGameStart();
 }
 
 // Toggle player ready status
+// Update the toggleReady function in lobby.js
 function toggleReady() {
     console.log("Promena statusa spremnosti");
     const readyBtn = document.getElementById('readyBtn');
@@ -341,24 +382,22 @@ function toggleReady() {
         return;
     }
     
+    // Check if we have a valid player ID
+    if (!currentPlayerId) {
+        console.error("Nema validnog ID-a igrača!");
+        return;
+    }
+    
     const isReady = readyBtn.textContent.trim() === 'Spreman!';
     console.log("Trenutni status:", isReady ? "spreman" : "nije spreman");
+    console.log("Using player ID:", currentPlayerId);
     
-    const playerRef = firebase.database().ref(`games/${currentGameId}/players/${currentPlayerId}/isReady`);
+    const playerRef = firebase.database().ref(`games/${lobbyGameId}/players/${currentPlayerId}/isReady`);
     
     playerRef.set(!isReady)
         .then(() => {
             console.log("Status spremnosti uspešno promenjen na:", !isReady);
-            // Update button appearance
-            if (!isReady) {
-                readyBtn.classList.remove('btn-outline-success');
-                readyBtn.classList.add('btn-success');
-                readyBtn.innerHTML = '<i class="fas fa-check-circle me-2"></i>Spreman!';
-            } else {
-                readyBtn.classList.add('btn-outline-success');
-                readyBtn.classList.remove('btn-success');
-                readyBtn.innerHTML = '<i class="fas fa-check-circle me-2"></i>Spremi se';
-            }
+            // Update button appearance - handles in real-time listener
         })
         .catch(error => {
             console.error('Error toggling ready status:', error);
