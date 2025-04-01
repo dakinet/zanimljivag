@@ -1,6 +1,6 @@
 // Game variables
 let gameData = null;
-let currentUser = null;
+let lobbyCurrentUser = null;
 let currentPlayerId = null;
 let currentRound = 1;
 let currentLetter = '';
@@ -34,8 +34,8 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
     
-    currentUser = JSON.parse(userJSON);
-    currentPlayerId = generatePlayerId(currentUser.username);
+    lobbyCurrentUser = JSON.parse(userJSON);
+    currentPlayerId = generatePlayerId(lobbyCurrentUser.username);
     
     // Initialize category inputs
     initializeCategoryInputs();
