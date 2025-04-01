@@ -11,6 +11,15 @@ let currentGameId = null;
 
 // DOM Ready
 document.addEventListener('DOMContentLoaded', () => {
+    console.log("====== PROVERA APLIKACIJE ======");
+    console.log("Trenutni URL:", window.location.href);
+    console.log("GameId iz URL:", new URLSearchParams(window.location.search).get('gameId'));
+    console.log("Igrač iz localStorage:", localStorage.getItem('zgUser'));
+    console.log("Game ID iz localStorage:", localStorage.getItem('zgGameId'));
+    // ostatak koda...
+});
+
+document.addEventListener('DOMContentLoaded', () => {
     console.log("Lobby stranica učitana");
     
     // Provjera da li je Firebase dostupan
