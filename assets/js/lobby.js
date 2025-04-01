@@ -249,7 +249,7 @@ function setupRealtimeListeners(gameId) {
         
         if (status === 'active') {
             // Game has started, redirect to game page
-            window.location.href = 'game.html?gameId=' + gameId;
+            window.location.href = 'game-play.html?gameId=' + gameId;
         }
     }, (error) => {
         console.error("Greška pri slušanju promena statusa igre:", error);
