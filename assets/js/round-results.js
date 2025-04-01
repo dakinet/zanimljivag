@@ -3,7 +3,7 @@
 
 // Game variables
 let gameData = null;
-let currentUser = null;
+let resultUser = null;
 let currentPlayerId = null;
 let roundData = null;
 let currentRound = 1;
@@ -35,7 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
     
-    currentUser = JSON.parse(userJSON);
+    resultsUser  = JSON.parse(userJSON);
     currentPlayerId = generatePlayerId(currentUser.username);
     
     // Update round number display
@@ -49,8 +49,19 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Generate player ID
+// Replace this function in round-results.js:
 function generatePlayerId(username) {
-    return username.toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Date.now().toString(36);
+    // We need to find the existing player ID in the game data
+    if (gameData && gameData.players) {
+        for (const pid in gameData.players) {
+            if (gameData.players[pid].username === username) {
+                return pid;
+            }
+        }
+    }
+    
+    // Fallback to basic ID if not found (shouldn't happen)
+    return username.toLowerCase().replace(/[^a-z0-9]/g, '_');
 }
 
 // Setup event listeners
@@ -78,9 +89,21 @@ function loadGameData(gameId) {
         gameData = snapshot.val();
         gameData.id = gameId;
         
-        // Check if current player is creator
-        if (gameData.players && gameData.players[currentPlayerId] && gameData.players[currentPlayerId].isCreator) {
-            isCreator = true;
+        console.log("Game data loaded:", gameData);
+        
+        // Find the current player ID from existing data
+        if (gameData.players) {
+            for (const pid in gameData.players) {
+                if (gameData.players[pid].username === resultsUser.username) {
+                    currentPlayerId = pid;
+                    console.log("Found existing player ID:", currentPlayerId);
+                    
+                    // Check if current player is creator
+                    isCreator = gameData.players[pid].isCreator === true;
+                    console.log("Is creator:", isCreator);
+                    break;
+                }
+            }
         }
         
         // Get game settings
@@ -110,6 +133,7 @@ function loadGameData(gameId) {
             startNextRoundCountdown();
         } else {
             // Round doesn't exist
+            console.error("Round doesn't exist in game data!");
             alert('Runda ne postoji.');
             window.location.href = 'index.html';
         }
@@ -264,26 +288,44 @@ function startNextRoundCountdown() {
 }
 
 // Go to next round
+// Update this function in round-results.js
 function goToNextRound() {
     // Clear countdown if running
     if (countdownInterval) {
         clearInterval(countdownInterval);
     }
     
+    console.log("Going to next round...");
+    console.log("Current round:", currentRound, "Total rounds:", totalRounds);
+    
     // Check if this was the last round
     if (currentRound >= totalRounds) {
-        // Go to final results
+        console.log("This was the last round, going to final results");
         window.location.href = `final-results.html?gameId=${gameData.id}`;
         return;
     }
     
-    // Only creator will create the next round
+    // Only creator should create next round
+    const nextRound = currentRound + 1;
+    console.log("Going to next round:", nextRound);
+    
     if (isCreator) {
+        console.log("I'm the creator, creating next round");
         // Create next round
-        createNextRound();
+        createNextRound(gameData.id, nextRound)
+            .then(() => {
+                console.log("Next round created, redirecting to game-play.html");
+                // Go to game page
+                window.location.href = `game-play.html?gameId=${gameData.id}`;
+            })
+            .catch(error => {
+                console.error('Error creating next round:', error);
+                alert('Došlo je do greške pri kreiranju sledeće runde.');
+            });
     } else {
-        // Non-creators will just go to the game page
-        window.location.href = `game.html?gameId=${gameData.id}`;
+        // Non-creators just go to the game page
+        console.log("I'm not the creator, just going to game-play.html");
+        window.location.href = `game-play.html?gameId=${gameData.id}`;
     }
 }
 
@@ -304,6 +346,7 @@ function createNextRound() {
 
 // Create a new round
 function createNewRound(gameId, roundNumber) {
+    console.log("Creating new round:", roundNumber);
     const roundRef = firebase.database().ref(`games/${gameId}/rounds/${roundNumber}`);
     
     // Get settings to get disabled letters
@@ -322,7 +365,28 @@ function createNewRound(gameId, roundNumber) {
             
             // Generate random letter (excluding disabled and used)
             const letter = generateRandomLetter(disabledLetters, usedLetters);
+            console.log("Generated letter for new round:", letter);
             
+            // Reset player finished status for the new round
+            const playersRef = firebase.database().ref(`games/${gameId}/players`);
+            playersRef.once('value', (playersSnapshot) => {
+                const players = playersSnapshot.val() || {};
+                
+                // Update each player's isFinished status to false
+                const updates = {};
+                for (const pid in players) {
+                    updates[`${pid}/isFinished`] = false;
+                }
+                
+                // Apply updates
+                if (Object.keys(updates).length > 0) {
+                    playersRef.update(updates).then(() => {
+                        console.log("Reset all players' finished status");
+                    });
+                }
+            });
+            
+            // Create the new round
             return roundRef.set({
                 letter: letter,
                 startedAt: firebase.database.ServerValue.TIMESTAMP,

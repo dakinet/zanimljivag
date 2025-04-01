@@ -55,6 +55,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Generate player ID
 function generatePlayerId(username) {
+    // Find the existing player ID in the game data
+    if (gameData && gameData.players) {
+        for (const pid in gameData.players) {
+            if (gameData.players[pid].username === username) {
+                return pid;
+            }
+        }
+    }
+    
+    // Fallback to basic ID
     return username.toLowerCase().replace(/[^a-z0-9]/g, '_');
 }
 
