@@ -524,3 +524,59 @@ h1, h2, h3, h4, h5, h6 {
 .correct-answer {
     animation: correct-answer 1s ease-in-out;
 }
+
+/* Add these rules to assets/css/style.css */
+
+/* Verification Table Styles */
+.verification-table th,
+.verification-table td {
+    vertical-align: middle;
+    padding: 8px 12px;
+}
+
+.verification-table td {
+    position: relative;
+    white-space: nowrap;
+}
+
+/* Checkbox alignment */
+.verification-checkbox {
+    vertical-align: middle;
+    margin-left: 10px !important;
+    margin-right: 5px !important;
+    display: inline-block !important;
+}
+
+/* Answer text and flag alignment */
+.answer-content {
+    display: inline-block;
+    vertical-align: middle;
+    margin-right: 8px;
+}
+
+/* Flag container */
+.flag-answer-container {
+    display: flex !important;
+    align-items: center;
+    white-space: nowrap;
+}
+
+.flag-answer-container img {
+    margin-right: 8px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .verification-table {
+        font-size: 0.9rem;
+    }
+    
+    .verification-table th,
+    .verification-table td {
+        padding: 6px 8px;
+    }
+    
+    .verification-checkbox {
+        margin-left: 5px !important;
+    }
+}

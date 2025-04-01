@@ -3,7 +3,7 @@
 
 // Game variables
 let gameData = null;
-let verifyUser = null;  // Promenjena varijabla currentUser u verifyUser da se izbegne konflikt
+let verifyUser = null;  
 let currentPlayerId = null;
 let roundData = null;
 let currentRound = 1;
@@ -39,9 +39,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     verifyUser = JSON.parse(userJSON);
-    currentPlayerId = null;
     
-    console.log("Korisnik za verifikaciju:", verifyUser.username, "ID:", currentPlayerId);
+    console.log("Korisnik za verifikaciju:", verifyUser.username);
     
     // Update round number display
     document.getElementById('roundNumber').textContent = currentRound;
@@ -96,6 +95,17 @@ function loadGameData(gameId) {
         
         console.log("Podaci igre učitani:", gameData);
         
+        // Set currentPlayerId based on username
+        if (gameData.players) {
+            for (const pid in gameData.players) {
+                if (gameData.players[pid].username === verifyUser.username) {
+                    currentPlayerId = pid;
+                    console.log("Set currentPlayerId:", currentPlayerId);
+                    break;
+                }
+            }
+        }
+        
         // Get game settings
         const settings = gameData.settings;
         if (settings) {
@@ -116,6 +126,9 @@ function loadGameData(gameId) {
             // Get all players
             allPlayersData = gameData.players || {};
             
+            // Check if current user should be on the verification page
+            checkVerifierStatus();
+            
             // Load answers for verification
             loadAnswersForVerification();
         } else {
@@ -128,6 +141,21 @@ function loadGameData(gameId) {
         console.error('Error loading game:', error);
         alert('Došlo je do greške pri učitavanju igre.');
     });
+}
+
+// Check if the current user should be the verifier
+function checkVerifierStatus() {
+    if (!roundData || !roundData.verification) return;
+    
+    const verifierPlayerId = roundData.verification.verifiedBy;
+    
+    if (verifierPlayerId && verifierPlayerId !== currentPlayerId) {
+        console.log("This user is not the designated verifier, redirecting to results");
+        // Redirect to results page
+        window.location.href = `round-results.html?gameId=${gameData.id}&round=${currentRound}`;
+    } else {
+        console.log("User is the designated verifier");
+    }
 }
 
 // Load answers for verification
@@ -259,17 +287,28 @@ function buildVerificationTable(answers) {
                     answerValue = ''; // Invalid flag code
                 }
             } else {
-                answerCell.textContent = answerValue;
+                // Create a div for the answer content
+                const answerText = document.createElement('div');
+                answerText.textContent = answerValue;
+                answerText.style.display = 'inline-block';
+                answerCell.appendChild(answerText);
             }
             
             // Add checkbox for verification
             if (answerValue.trim() !== '') {
+                // Create a container for the checkbox to control layout
+                const checkboxContainer = document.createElement('div');
+                checkboxContainer.className = 'd-inline-block ms-2';
+                
                 const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
-                checkbox.className = 'form-check-input verification-checkbox ms-2';
+                checkbox.className = 'form-check-input verification-checkbox';
                 checkbox.dataset.playerId = player.id;
                 checkbox.dataset.category = category.id;
                 checkbox.checked = true; // Default to checked (correct)
+                
+                checkboxContainer.appendChild(checkbox);
+                answerCell.appendChild(checkboxContainer);
                 
                 // Store in verificationData
                 if (!verificationData[player.id]) {
@@ -281,8 +320,6 @@ function buildVerificationTable(answers) {
                 checkbox.addEventListener('change', (e) => {
                     verificationData[player.id][category.id] = e.target.checked;
                 });
-                
-                answerCell.appendChild(checkbox);
             }
             
             row.appendChild(answerCell);
