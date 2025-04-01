@@ -1,4 +1,231 @@
-/* Main Theme Variables */
+/* Player Avatars */
+.player-avatar {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.8rem;
+    font-weight: bold;
+    margin: 0 auto;
+}
+
+.first-place {
+    background: linear-gradient(135deg, #FFD700, #FFC107);
+    box-shadow: 0 0 15px rgba(255, 215, 0, 0.6);
+    color: #000;
+}
+
+.second-place {
+    background: linear-gradient(135deg, #C0C0C0, #9E9E9E);
+    box-shadow: 0 0 10px rgba(192, 192, 192, 0.6);
+    color: #000;
+}
+
+.third-place {
+    background: linear-gradient(135deg, #CD7F32, #8D6E63);
+    box-shadow: 0 0 10px rgba(205, 127, 50, 0.6);
+    color: #000;
+}
+
+/* Podium Styles */
+.podium-container {
+    perspective: 1000px;
+}
+
+.podium {
+    margin-top: 50px;
+}
+
+.podium-1st, .podium-2nd, .podium-3rd {
+    position: relative;
+    margin: 0 5px;
+    border-radius: 5px 5px 0 0;
+    animation: podiumAppear 1s ease-out forwards;
+    transform: translateY(100px);
+    opacity: 0;
+}
+
+.podium-1st {
+    animation-delay: 0.2s;
+}
+
+.podium-2nd {
+    animation-delay: 0.4s;
+}
+
+.podium-3rd {
+    animation-delay: 0.6s;
+}
+
+@keyframes podiumAppear {
+    0% {
+        transform: translateY(100px);
+        opacity: 0;
+    }
+    100% {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* Trophy animation */
+.trophy {
+    font-size: 2.5rem;
+    animation: trophyGlow 2s infinite;
+}
+
+@keyframes trophyGlow {
+    0% {
+        text-shadow: 0 0 5px rgba(255, 215, 0, 0.5);
+        transform: scale(1);
+    }
+    50% {
+        text-shadow: 0 0 20px rgba(255, 215, 0, 0.8), 0 0 30px rgba(255, 215, 0, 0.6);
+        transform: scale(1.1);
+    }
+    100% {
+        text-shadow: 0 0 5px rgba(255, 215, 0, 0.5);
+        transform: scale(1);
+    }
+}
+
+/* Confetti Animation */
+.confetti-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 1000;
+    overflow: hidden;
+}
+
+.confetti {
+    position: absolute;
+    width: 10px;
+    height: 20px;
+    top: -20px;
+    animation: confetti-fall 6s linear infinite;
+}
+
+@keyframes confetti-fall {
+    0% {
+        transform: translateY(0) rotate(0deg);
+        opacity: 1;
+    }
+    75% {
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(100vh) rotate(360deg);
+        opacity: 0;
+    }
+}
+
+/* Responsive Styles for Podium */
+@media (max-width: 768px) {
+    .podium-1st, .podium-2nd, .podium-3rd {
+        width: 80px;
+    }
+    
+    .podium-1st {
+        height: 100px;
+    }
+    
+    .podium-2nd {
+        height: 70px;
+    }
+    
+    .podium-3rd {
+        height: 40px;
+    }
+    
+    .player-avatar {
+        width: 50px;
+        height: 50px;
+        font-size: 1.5rem;
+    }
+    
+    .trophy {
+        font-size: 2rem;
+    }
+}
+
+/* Mobile Category Navigation */
+.scroll-controls {
+    background-color: var(--bg-darker);
+    border-radius: 10px;
+    padding: 10px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+}
+
+.current-category-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--accent-teal);
+    font-weight: 600;
+    font-size: 1.2rem;
+}
+
+/* Player Progress Bar */
+.player-progress {
+    margin: 0 5px 5px 0;
+    padding: 5px 10px;
+    border-radius: 5px;
+    transition: all 0.3s ease;
+}
+
+.player-progress:hover {
+    background-color: rgba(0, 255, 204, 0.1);
+}
+
+/* Custom Border for Verification Table */
+.verification-table {
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.verification-table th,
+.verification-table td {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.verification-table th {
+    background-color: var(--bg-darker);
+}
+
+/* Verification Checkbox */
+.verification-checkbox {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--accent-teal);
+}
+
+/* Toast Border */
+.border-neon {
+    border: 1px solid var(--accent-teal);
+}
+
+/* Button Pulse Animation */
+.pulse-animation {
+    animation: pulse-button 1.5s infinite;
+}
+
+@keyframes pulse-button {
+    0% {
+        box-shadow: 0 0 0 0 rgba(0, 255, 204, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(0, 255, 204, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(0, 255, 204, 0);
+    }
+}/* Main Theme Variables */
 :root {
     --bg-dark: #1A1A1D;
     --bg-darker: #121212;
