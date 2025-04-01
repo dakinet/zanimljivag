@@ -1,13 +1,13 @@
 // assets/js/lobby.js
 // Logika za lobby igre
-/*
+
 // Game and player data
 let gameData = null;
 let lobbyCurrUser  = null;
 let currentPlayerId = null;
 let countdownInterval = null;
 let playersData = {};
-let currentGameId = null;
+//let currentGameId = null;
 
 // DOM Ready
 document.addEventListener('DOMContentLoaded', () => {
@@ -565,4 +565,4 @@ function showToast(message) {
     
     bsToast.show();
 }
-*/
+
