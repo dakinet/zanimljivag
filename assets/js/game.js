@@ -283,6 +283,7 @@ function updateTimerDisplay(seconds) {
 }
 
 // Load flags data
+// Load flags data
 function loadFlags() {
     // Inicijalizacija handlera za zastave sa podacima
     if (typeof flagsData !== 'undefined' && typeof FlagHandler !== 'undefined') {
@@ -298,7 +299,8 @@ function loadFlags() {
             // Dodaj sve zastave u grid
             Object.values(flagsData).forEach(flag => {
                 const flagImg = document.createElement('img');
-                flagImg.src = `assets/flags/${flag.code.toLowerCase()}-flag.gif`;
+                // Novi format naziva zastava: [country-code]-flag.webp
+                flagImg.src = `assets/flags/${flag.code.toLowerCase()}-flag.webp`;
                 flagImg.alt = flag.name;
                 flagImg.title = flag.name;
                 flagImg.className = 'flag-item';
