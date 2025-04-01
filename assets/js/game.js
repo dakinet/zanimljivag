@@ -352,7 +352,7 @@ function loadFlags() {
             // Dodaj sve zastave u grid
             Object.values(flagsData).forEach(flag => {
                 const flagImg = document.createElement('img');
-                flagImg.src = `assets/flags/${flag.code.toLowerCase()}.gif`;
+                flagImg.src = `assets/flags/${flag.code.toLowerCase()}-flag.webpf`;
                 flagImg.alt = flag.name; 
                 // Uklanjamo title atribut da se ne bi prikazivao tooltip
                 // flagImg.title = flag.name;  
