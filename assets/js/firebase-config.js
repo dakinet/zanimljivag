@@ -1,34 +1,27 @@
 // assets/js/firebase-config.js
 // Konfiguracija i inicijalizacija Firebase-a
 
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
-import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
-import { getDatabase } from "firebase/database";
-
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+// Firebase konfiguracija
 const firebaseConfig = {
   apiKey: "AIzaSyCbEb6Ydq65X2G0_z0_G1djaucHM1Oo5r0",
   authDomain: "zanimljivageografija-3f742.firebaseapp.com",
   databaseURL: "https://zanimljivageografija-3f742-default-rtdb.europe-west1.firebasedatabase.app",
   projectId: "zanimljivageografija-3f742",
-  storageBucket: "zanimljivageografija-3f742.firebasestorage.app",
+  storageBucket: "zanimljivageografija-3f742.appspot.com",
   messagingSenderId: "535952181132",
-  appId: "1:535952181132:web:e3bd0bb690c82e131638a9",
-  measurementId: "G-CDDZX2P5R6"
+  appId: "1:535952181132:web:cd30dba0bda24a981638a9",
+  measurementId: "G-HYEKVM53S7"
 };
 
 // Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
-const auth = getAuth(app);
-const database = getDatabase(app);
+firebase.initializeApp(firebaseConfig);
+
+// Initialize Authentication
+const auth = firebase.auth();
 
 // Initialize Anonymous Authentication
 function initAnonymousAuth() {
-  signInAnonymously(auth)
+  auth.signInAnonymously()
     .then(() => {
       console.log('Signed in anonymously');
     })
@@ -38,7 +31,7 @@ function initAnonymousAuth() {
 }
 
 // Listen for authentication state changes
-onAuthStateChanged(auth, (user) => {
+auth.onAuthStateChanged((user) => {
   if (user) {
     // User is signed in
     console.log('User is signed in with UID:', user.uid);
@@ -54,6 +47,3 @@ onAuthStateChanged(auth, (user) => {
 document.addEventListener('DOMContentLoaded', () => {
   initAnonymousAuth();
 });
-
-// Export Firebase instances to make them available to other files
-export { app, auth, database };
