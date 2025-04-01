@@ -22,35 +22,25 @@ const FlagHandler = {
     },
     
     // Update flag grid to show flags starting with specific letter
-    updateFlagGrid: function(letter) {
-        const flagGrid = document.getElementById('flagGrid');
-        if (!flagGrid || !letter) return;
+    function updateFlagGrid() {
+    const flagGrid = document.getElementById('flagGrid');
+    if (!flagGrid) return;
+    
+    // Clear grid
+    flagGrid.innerHTML = '';
+    
+    // Add all flags to grid (no filtering by letter)
+    Object.values(this.flags).forEach(flag => {
+        const flagImg = document.createElement('img');
+        flagImg.src = `assets/flags/${flag.code.toLowerCase()}.gif`; 
+        flagImg.alt = flag.name;
+        flagImg.title = flag.name;
+        flagImg.className = 'flag-item';
+        flagImg.dataset.code = flag.code;
         
-        // Clear grid
-        flagGrid.innerHTML = '';
-        
-        // Filter flags that start with current letter
-        const matchingFlags = Object.values(this.flags).filter(flag => 
-            flag.name.charAt(0).toUpperCase() === letter
-        );
-        
-        if (matchingFlags.length === 0) {
-            flagGrid.innerHTML = '<p class="text-light">Nema zastava na ovo slovo.</p>';
-            return;
-        }
-        
-        // Add matching flags to grid
-        matchingFlags.forEach(flag => {
-            const flagImg = document.createElement('img');
-            flagImg.src = `assets/flags/${flag.code.toLowerCase()}.gif`; // Assuming this path
-            flagImg.alt = flag.name;
-            flagImg.title = flag.name;
-            flagImg.className = 'flag-item';
-            flagImg.dataset.code = flag.code;
-            
-            flagGrid.appendChild(flagImg);
-        });
-    },
+        flagGrid.appendChild(flagImg);
+    });
+}
     
     // Select a flag
     selectFlag: function(flagElement) {
