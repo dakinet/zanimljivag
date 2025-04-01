@@ -22,25 +22,25 @@ const FlagHandler = {
     },
     
     // Update flag grid to show flags starting with specific letter
-    function updateFlagGrid() {
+   updateFlagGrid: function() {
     const flagGrid = document.getElementById('flagGrid');
     if (!flagGrid) return;
     
     // Clear grid
     flagGrid.innerHTML = '';
-    
+
     // Add all flags to grid (no filtering by letter)
     Object.values(this.flags).forEach(flag => {
         const flagImg = document.createElement('img');
-        flagImg.src = `assets/flags/${flag.code.toLowerCase()}.gif`; 
+        flagImg.src = `assets/flags/${flag.code.toLowerCase()}.gif`;
         flagImg.alt = flag.name;
         flagImg.title = flag.name;
         flagImg.className = 'flag-item';
         flagImg.dataset.code = flag.code;
-        
+
         flagGrid.appendChild(flagImg);
     });
-}
+},
     
     // Select a flag
     selectFlag: function(flagElement) {
