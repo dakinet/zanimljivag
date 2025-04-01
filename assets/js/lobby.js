@@ -462,14 +462,14 @@ function isCreator() {
 function startGame() {
     if (!gameData) return;
     
-    console.log("Pokretanje igre:", currentGameId);
+    console.log("Pokretanje igre:", lobbyGameId);
     
     // Update game status to active
-    firebase.database().ref(`games/${currentGameId}/settings/status`).set('active')
+    firebase.database().ref(`games/${lobbyGameId}/settings/status`).set('active')
         .then(() => {
             console.log("Status igre promenjen na 'active'");
             // Create first round
-            return createNewRound(currentGameId, 1);
+            return createNewRound(lobbyGameId, 1);
         })
         .catch(error => {
             console.error('Error starting game:', error);
