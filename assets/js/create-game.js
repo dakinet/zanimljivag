@@ -1,5 +1,22 @@
 // DOM Ready
 document.addEventListener('DOMContentLoaded', () => {
+    console.log("Create Game stranica učitana");
+    
+    // Provjera da li je Firebase dostupan
+    if (typeof firebase === 'undefined') {
+        console.error("Firebase nije dostupan! Provjerite skripte.");
+        alert("Greška: Firebase biblioteka nije učitana. Moguće je da imate problem s internetskom vezom ili blokiranjem skripti.");
+        return;
+    }
+    
+    if (typeof firebase.database !== 'function') {
+        console.error("Firebase Database nije dostupan! Provjerite skripte.");
+        alert("Greška: Firebase Database nije dostupan. Provjerite učitavanje skripti.");
+        return;
+    }
+    
+    console.log("Firebase i Firebase Database uspješno učitani.");
+    
     // Initialize sliders
     initSliders();
     
@@ -9,7 +26,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Setup create game button
     const createGameSubmitBtn = document.getElementById('createGameSubmitBtn');
     if (createGameSubmitBtn) {
+        console.log("Postavljanje event listenera za dugme kreiranja igre");
         createGameSubmitBtn.addEventListener('click', handleCreateGame);
+    } else {
+        console.error("Dugme za kreiranje igre nije pronađeno!");
     }
     
     // Setup copy buttons
@@ -102,16 +122,20 @@ function generateLetterCheckboxes() {
 
 // Handle create game button click
 function handleCreateGame() {
+    console.log("Kliknuto na dugme za kreiranje igre");
+    
     // Get current user from localStorage
     const userJSON = localStorage.getItem('zgUser');
     
     if (!userJSON) {
+        console.log("Korisnik nije postavljen, preusmeravanje na početnu stranicu");
         // Redirect to home page if user not set
         window.location.href = 'index.html';
         return;
     }
     
     const user = JSON.parse(userJSON);
+    console.log("Korisnik učitan iz localStorage:", user);
     
     // Get game settings
     const roundTime = parseInt(document.getElementById('roundTime').value);
@@ -125,8 +149,15 @@ function handleCreateGame() {
         disabledLetters.push(checkbox.value);
     });
     
+    console.log("Postavke igre:", {
+        roundTime,
+        totalRounds,
+        disabledLetters
+    });
+    
     // Generate game ID
     const gameId = generateGameId();
+    console.log("Generisani gameId:", gameId);
     
     // Create game in Firebase
     createGameInFirebase(gameId, user, roundTime, totalRounds, disabledLetters);
@@ -141,11 +172,14 @@ function generateGameId() {
         result += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     
+    console.log("Generisani ID igre:", result);
     return result;
 }
 
 // Create game in Firebase
 function createGameInFirebase(gameId, user, roundTime, totalRounds, disabledLetters) {
+    console.log("Kreiranje igre u Firebase-u:", gameId, user, roundTime, totalRounds, disabledLetters);
+    
     const gameRef = firebase.database().ref('games/' + gameId);
     
     // Game settings object
@@ -158,10 +192,13 @@ function createGameInFirebase(gameId, user, roundTime, totalRounds, disabledLett
         createdBy: user.username
     };
     
+    console.log("Postavke igre:", gameSettings);
+    
     // Create the game
     gameRef.set({
         settings: gameSettings
     }).then(() => {
+        console.log("Igra kreirana, dodavanje kreatora kao igrača...");
         // Add the creator as a player
         const playerId = generatePlayerId(user.username);
         
@@ -174,13 +211,14 @@ function createGameInFirebase(gameId, user, roundTime, totalRounds, disabledLett
             isCreator: true
         };
         
-        gameRef.child('players/' + playerId).set(playerData).then(() => {
-            // Store game ID
-            localStorage.setItem('zgGameId', gameId);
-            
-            // Show success modal
-            showGameCreatedModal(gameId);
-        });
+        return gameRef.child('players/' + playerId).set(playerData);
+    }).then(() => {
+        console.log("Kreator dodat kao igrač, spremanje gameId...");
+        // Store game ID
+        localStorage.setItem('zgGameId', gameId);
+        
+        // Show success modal
+        showGameCreatedModal(gameId);
     }).catch(error => {
         console.error('Error creating game:', error);
         alert('Došlo je do greške pri kreiranju igre. Pokušajte ponovo.');
@@ -189,7 +227,10 @@ function createGameInFirebase(gameId, user, roundTime, totalRounds, disabledLett
 
 // Generate player ID based on username
 function generatePlayerId(username) {
-    return username.toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Date.now().toString(36);
+    console.log("Generiranje ID-a za igrača:", username);
+    const id = username.toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Date.now().toString(36);
+    console.log("Generirani ID:", id);
+    return id;
 }
 
 // Show game created modal
