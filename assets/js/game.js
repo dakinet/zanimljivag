@@ -298,7 +298,7 @@ function loadFlags() {
             // Dodaj sve zastave u grid
             Object.values(flagsData).forEach(flag => {
                 const flagImg = document.createElement('img');
-                flagImg.src = `assets/flags/${flag.code.toLowerCase()}.gif`;
+                flagImg.src = `assets/flags/${flag.code.toLowerCase()}-flag.gif`;
                 flagImg.alt = flag.name;
                 flagImg.title = flag.name;
                 flagImg.className = 'flag-item';
