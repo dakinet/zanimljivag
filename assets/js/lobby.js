@@ -1,3 +1,6 @@
+// assets/js/lobby.js
+// Logika za lobby igre
+
 // Game and player data
 let gameData = null;
 let currentUser = null;
@@ -56,7 +59,15 @@ function setupEventListeners() {
 
 // Generate player ID
 function generatePlayerId(username) {
-    return username.toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Date.now().toString(36);
+    console.log("Generiranje ID za igrača:", username);
+    
+    // Create a consistent ID based on username
+    // This ensures the same player gets the same ID across sessions
+    const baseId = username.toLowerCase().replace(/[^a-z0-9]/g, '_');
+    const id = baseId + '_' + Date.now().toString(36);
+    
+    console.log("Generirani ID:", id);
+    return id;
 }
 
 // Load game data
@@ -312,15 +323,35 @@ function showToast(message) {
 
 // Add player to game
 function addPlayerToGame(gameId, user) {
+    console.log("Dodavanje igrača", user.username, "u igru", gameId);
+    
+    // Generate a unique player ID if not already set
+    if (!currentPlayerId) {
+        currentPlayerId = generatePlayerId(user.username);
+    }
+    
+    console.log("Korišćenje playerID:", currentPlayerId);
+    
     const playerRef = firebase.database().ref('games/' + gameId + '/players/' + currentPlayerId);
     
-    playerRef.set({
+    const playerData = {
         username: user.username,
         isReady: false,
         isFinished: false,
         joinedAt: firebase.database.ServerValue.TIMESTAMP,
         totalScore: 0
-    });
+    };
+    
+    console.log("Podaci igrača za upis:", playerData);
+    
+    playerRef.set(playerData)
+        .then(() => {
+            console.log("Igrač uspešno dodat u igru!");
+        })
+        .catch(error => {
+            console.error("Greška pri dodavanju igrača:", error);
+            alert("Greška pri pridruživanju igri: " + error.message);
+        });
 }
 
 // Display game settings
@@ -346,23 +377,32 @@ function displayGameSettings() {
 
 // Setup real-time listeners
 function setupRealtimeListeners(gameId) {
+    console.log("Postavljanje real-time listenera za igru:", gameId);
     const gameRef = firebase.database().ref('games/' + gameId);
     
     // Listen for players changes
+    console.log("Postavljanje listenera za promene igrača...");
     gameRef.child('players').on('value', (snapshot) => {
+        console.log("Primljena promena igrača:", snapshot.val());
         playersData = snapshot.val() || {};
         updatePlayersList();
         checkGameStart();
+    }, (error) => {
+        console.error("Greška pri slušanju promena igrača:", error);
     });
     
     // Listen for game status changes
+    console.log("Postavljanje listenera za promene statusa igre...");
     gameRef.child('settings/status').on('value', (snapshot) => {
         const status = snapshot.val();
+        console.log("Primljena promena statusa igre:", status);
         
         if (status === 'active') {
             // Game has started, redirect to game page
             window.location.href = 'game.html?gameId=' + gameId;
         }
+    }, (error) => {
+        console.error("Greška pri slušanju promena statusa igre:", error);
     });
 }
 
@@ -371,13 +411,18 @@ function updatePlayersList() {
     const playersList = document.getElementById('playersList');
     const playerCount = document.getElementById('playerCount');
     
-    if (!playersList || !playerCount) return;
+    if (!playersList || !playerCount) {
+        console.error("Elementi za prikaz igrača nisu pronađeni!");
+        return;
+    }
     
     // Clear players list
     playersList.innerHTML = '';
     
     // Count players
     const players = Object.values(playersData);
+    console.log("Ažuriranje liste igrača, pronađeno:", players.length, "igrača");
+    console.log("Podaci o igračima:", playersData);
     playerCount.textContent = players.length + '/10';
     
     // Sort players: first creator, then ready players, then others
@@ -388,6 +433,54 @@ function updatePlayersList() {
         if (!a.isReady && b.isReady) return 1;
         return 0;
     });
+    
+    // Add each player to the list
+    players.forEach(player => {
+        console.log("Dodajem igrača u listu:", player.username, "spreman:", player.isReady);
+        // Create player progress element
+        const playerItem = document.createElement('div');
+        playerItem.className = 'd-flex justify-content-between align-items-center mb-2';
+        
+        // Player name and status
+        const nameContainer = document.createElement('div');
+        nameContainer.className = 'd-flex align-items-center';
+        
+        const statusIndicator = document.createElement('span');
+        statusIndicator.className = 'player-status ' + (player.isReady ? 'status-ready' : 'status-not-ready');
+        
+        const playerName = document.createElement('span');
+        playerName.className = 'ms-2';
+        playerName.textContent = player.username;
+        
+        if (player.isCreator) {
+            const creatorBadge = document.createElement('span');
+            creatorBadge.className = 'badge bg-neon ms-2';
+            creatorBadge.textContent = 'Kreator';
+            playerName.appendChild(creatorBadge);
+        }
+        
+        nameContainer.appendChild(statusIndicator);
+        nameContainer.appendChild(playerName);
+        
+        // Ready status text
+        const readyStatus = document.createElement('span');
+        readyStatus.className = player.isReady ? 'text-success' : 'text-danger';
+        readyStatus.textContent = player.isReady ? 'Spreman' : 'Nije spreman';
+        
+        playerItem.appendChild(nameContainer);
+        playerItem.appendChild(readyStatus);
+        
+        playersList.appendChild(playerItem);
+        
+        // Highlight current player
+        if (player.username === currentUser.username) {
+            playerItem.classList.add('current-player');
+            playerItem.style.backgroundColor = 'rgba(0, 255, 204, 0.1)';
+            playerItem.style.borderLeft = '3px solid var(--accent-teal)';
+            playerItem.style.paddingLeft = '5px';
+        }
+    });
+}
     
     // Add each player to the list
     players.forEach(player => {
