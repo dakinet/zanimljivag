@@ -7,6 +7,7 @@ let currentUser = null;
 let currentPlayerId = null;
 let countdownInterval = null;
 let playersData = {};
+let currentGameId = null;
 
 // DOM Ready
 document.addEventListener('DOMContentLoaded', () => {
@@ -21,11 +22,11 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Get game ID from URL or localStorage
     const urlParams = new URLSearchParams(window.location.search);
-    const gameId = urlParams.get('gameId') || localStorage.getItem('zgGameId');
+    currentGameId = urlParams.get('gameId') || localStorage.getItem('zgGameId');
     
-    console.log("Dobijen gameId:", gameId);
+    console.log("Dobijen gameId iz URL-a ili localStorage:", currentGameId);
     
-    if (!gameId) {
+    if (!currentGameId) {
         // No game ID, redirect to home
         console.error("Nedostaje gameId, preusmeravanje na početnu stranicu");
         window.location.href = 'index.html';
@@ -35,7 +36,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Display game ID
     const gameIdElement = document.getElementById('gameId');
     if (gameIdElement) {
-        gameIdElement.textContent = gameId;
+        gameIdElement.textContent = currentGameId;
+        console.log("Prikazan gameId na stranici:", currentGameId);
     } else {
         console.error("Element za prikaz ID igre nije pronađen!");
     }
@@ -57,7 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
     
     // Load game data
-    loadGameData(gameId);
+    loadGameData(currentGameId);
 });
 
 // Setup event listeners
@@ -337,10 +339,6 @@ function toggleReady() {
     const isReady = readyBtn.textContent.trim() === 'Spreman!';
     console.log("Trenutni status:", isReady ? "spreman" : "nije spreman");
     
-    if (!currentGameId) {
-        currentGameId = gameData.id;
-    }
-    
     const playerRef = firebase.database().ref(`games/${currentGameId}/players/${currentPlayerId}/isReady`);
     
     playerRef.set(!isReady)
@@ -459,15 +457,14 @@ function isCreator() {
 function startGame() {
     if (!gameData) return;
     
-    const gameId = document.getElementById('gameId').textContent;
-    console.log("Pokretanje igre:", gameId);
+    console.log("Pokretanje igre:", currentGameId);
     
     // Update game status to active
-    firebase.database().ref(`games/${gameId}/settings/status`).set('active')
+    firebase.database().ref(`games/${currentGameId}/settings/status`).set('active')
         .then(() => {
             console.log("Status igre promenjen na 'active'");
             // Create first round
-            return createNewRound(gameId, 1);
+            return createNewRound(currentGameId, 1);
         })
         .catch(error => {
             console.error('Error starting game:', error);
