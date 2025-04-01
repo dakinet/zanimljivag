@@ -449,6 +449,7 @@ function updateUIWithSavedAnswers() {
 }
 
 // Update players progress
+// Update players progress
 function updatePlayersProgress() {
     const progressContainer = document.getElementById('playersProgress');
     if (!progressContainer) return;
@@ -459,14 +460,17 @@ function updatePlayersProgress() {
     // Get all players
     const players = [];
     for (const playerId in allPlayersData) {
-        players.push({
-            id: playerId,
-            ...allPlayersData[playerId]
-        });
+        if (allPlayersData[playerId]) {
+            players.push({
+                id: playerId,
+                username: allPlayersData[playerId].username || "Nepoznat",
+                ...allPlayersData[playerId]
+            });
+        }
     }
     
-    // Sort players by name
-    players.sort((a, b) => a.username.localeCompare(b.username));
+    // Sort players by name (sigurna verzija)
+    players.sort((a, b) => String(a.username || "").localeCompare(String(b.username || "")));
     
     // Add progress for each player
     players.forEach(player => {
@@ -488,7 +492,7 @@ function updatePlayersProgress() {
         // Player name
         const playerName = document.createElement('div');
         playerName.className = 'player-name';
-        playerName.textContent = player.username;
+        playerName.textContent = player.username || "Igrač";
         
         // Add to container
         playerEl.appendChild(playerName);
@@ -518,6 +522,7 @@ function navigateCategory(direction) {
 }
 
 // Submit player answers
+// Submit player answers
 function submitAnswers() {
     if (isRoundFinished) return; // Prevent multiple submissions
     
@@ -542,8 +547,10 @@ function submitAnswers() {
         object: categoryInputs.object.value.trim(),
         isFinished: true,
         finishedAt: firebase.database.ServerValue.TIMESTAMP,
-        username: lobbyCurrentUser.username // Dodajemo username u odgovore za lakšu identifikaciju
+        username: lobbyCurrentUser.username // Dodajemo username u odgovore
     };
+    
+    console.log("Šaljem odgovore:", answers);
     
     // Save answers to Firebase
     firebase.database().ref(`games/${gameData.id}/rounds/${currentRound}/answers/${currentPlayerId}`).update(answers)
@@ -559,15 +566,57 @@ function submitAnswers() {
             showToast('Odgovori su uspešno poslati!');
             
             // Mark player as finished in player data
-            firebase.database().ref(`games/${gameData.id}/players/${currentPlayerId}/isFinished`).set(true);
-            
-            // Check if all players finished
-            checkAllPlayersFinished();
+            firebase.database().ref(`games/${gameData.id}/players/${currentPlayerId}/isFinished`).set(true)
+                .then(() => {
+                    console.log("Igrač označen kao završen.");
+                    
+                    // Check if all players finished
+                    checkAllPlayersFinished();
+                })
+                .catch(error => {
+                    console.error("Greška pri označavanju igrača kao završenog:", error);
+                });
         })
         .catch(error => {
             console.error('Error submitting answers:', error);
             showToast('Došlo je do greške pri slanju odgovora. Pokušajte ponovo.');
         });
+}
+
+// Check if all players have finished
+function checkAllPlayersFinished() {
+    if (!gameData || !gameData.rounds || !gameData.rounds[currentRound]) return;
+    
+    const answers = gameData.rounds[currentRound].answers || {};
+    
+    // Get all player IDs
+    const playerIds = Object.keys(allPlayersData);
+    console.log("Igrači u igri:", playerIds);
+    
+    // Count finished players
+    let finishedPlayers = 0;
+    const finishedPlayerIds = [];
+    for (const playerId in answers) {
+        if (answers[playerId] && answers[playerId].isFinished) {
+            finishedPlayers++;
+            finishedPlayerIds.push(playerId);
+        }
+    }
+    
+    console.log(`Finished players: ${finishedPlayers}/${playerIds.length}`, finishedPlayerIds);
+    
+    // If all players finished, end round
+    if (finishedPlayers >= playerIds.length && playerIds.length > 0) {
+        console.log("Svi igrači su završili, postavlja se finishedAt timestamp");
+        // Update round finish time
+        firebase.database().ref(`games/${gameData.id}/rounds/${currentRound}/finishedAt`).set(firebase.database.ServerValue.TIMESTAMP)
+            .then(() => {
+                console.log("FinishedAt uspešno postavljen");
+            })
+            .catch(error => {
+                console.error("Greška pri postavljanju finishedAt:", error);
+            });
+    }
 }
 
 // Disable all inputs after submission
