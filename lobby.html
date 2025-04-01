@@ -32,7 +32,8 @@
                             <div>
                                 <h5 class="text-light mb-1">Kod igre:</h5>
                                 <div class="d-flex align-items-center">
-                                    <h3 id="gameId" class="text-neon mb-0 me-2">ABCDEF</h3>
+                                    <!-- ID će biti dinamički postavljen iz JS-a -->
+                                    <h3 id="gameId" class="text-neon mb-0 me-2"></h3>
                                     <button id="copyGameIdBtn" class="btn btn-sm btn-outline-neon">
                                         <i class="fas fa-copy"></i>
                                     </button>
@@ -40,7 +41,7 @@
                             </div>
                             <div class="text-end">
                                 <h5 class="text-light mb-1">Igrači:</h5>
-                                <h3 id="playerCount" class="text-neon mb-0">1/10</h3>
+                                <h3 id="playerCount" class="text-neon mb-0">0/10</h3>
                             </div>
                         </div>
                         
@@ -61,11 +62,11 @@
                                 <div class="game-settings p-3 bg-dark rounded">
                                     <div class="d-flex justify-content-between mb-2">
                                         <span class="text-light">Vreme po rundi:</span>
-                                        <span id="roundTimeDisplay" class="text-neon">2 min</span>
+                                        <span id="roundTimeDisplay" class="text-neon">-</span>
                                     </div>
                                     <div class="d-flex justify-content-between mb-2">
                                         <span class="text-light">Broj rundi:</span>
-                                        <span id="totalRoundsDisplay" class="text-neon">5</span>
+                                        <span id="totalRoundsDisplay" class="text-neon">-</span>
                                     </div>
                                     <div class="d-flex justify-content-between mb-2">
                                         <span class="text-light">Isključena slova:</span>
@@ -105,6 +106,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-analytics-compat.js"></script>
     
     <!-- Custom JS -->
     <script src="assets/js/firebase-config.js"></script>
