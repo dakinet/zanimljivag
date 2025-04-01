@@ -3,7 +3,7 @@
 
 // Game variables
 let gameData = null;
-let currentUser = null;
+let verifyUser = null;  // Promenjena varijabla currentUser u verifyUser da se izbegne konflikt
 let currentPlayerId = null;
 let roundData = null;
 let currentRound = 1;
@@ -14,10 +14,14 @@ let verificationData = {};
 
 // DOM Ready
 document.addEventListener('DOMContentLoaded', () => {
+    console.log("Verify.js učitan");
+    
     // Get game ID and round from URL
     const urlParams = new URLSearchParams(window.location.search);
     const gameId = urlParams.get('gameId') || localStorage.getItem('zgGameId');
     currentRound = parseInt(urlParams.get('round')) || 1;
+    
+    console.log("Verify stranica za igru:", gameId, "runda:", currentRound);
     
     if (!gameId) {
         // No game ID, redirect to home
@@ -34,8 +38,10 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
     
-    currentUser = JSON.parse(userJSON);
-    currentPlayerId = generatePlayerId(currentUser.username);
+    verifyUser = JSON.parse(userJSON);
+    currentPlayerId = generatePlayerId(verifyUser.username);
+    
+    console.log("Korisnik za verifikaciju:", verifyUser.username, "ID:", currentPlayerId);
     
     // Update round number display
     document.getElementById('roundNumber').textContent = currentRound;
@@ -49,7 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Generate player ID
 function generatePlayerId(username) {
-    return username.toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Date.now().toString(36);
+    return username.toLowerCase().replace(/[^a-z0-9]/g, '_');
 }
 
 // Setup event listeners
@@ -63,6 +69,7 @@ function setupEventListeners() {
 
 // Load game data
 function loadGameData(gameId) {
+    console.log("Učitavanje podataka igre za verifikaciju...");
     const gameRef = firebase.database().ref('games/' + gameId);
     
     // Check if game exists
@@ -76,6 +83,8 @@ function loadGameData(gameId) {
         
         gameData = snapshot.val();
         gameData.id = gameId;
+        
+        console.log("Podaci igre učitani:", gameData);
         
         // Get game settings
         const settings = gameData.settings;
@@ -101,6 +110,7 @@ function loadGameData(gameId) {
             loadAnswersForVerification();
         } else {
             // Round doesn't exist
+            console.error("Runda ne postoji u podacima igre!");
             alert('Runda ne postoji.');
             window.location.href = 'index.html';
         }
@@ -112,12 +122,15 @@ function loadGameData(gameId) {
 
 // Load answers for verification
 function loadAnswersForVerification() {
+    console.log("Učitavanje odgovora za verifikaciju...");
     if (!roundData || !roundData.answers) {
+        console.error("Nema odgovora za verifikaciju!");
         alert('Nema odgovora za verifikaciju.');
         return;
     }
     
     const answers = roundData.answers;
+    console.log("Odgovori za verifikaciju:", answers);
     
     // Build verification table
     buildVerificationTable(answers);
@@ -125,10 +138,14 @@ function loadAnswersForVerification() {
 
 // Build verification table
 function buildVerificationTable(answers) {
+    console.log("Izgradnja tabele za verifikaciju...");
     const verificationTable = document.getElementById('verificationTable');
     const tableHeader = document.querySelector('.verification-table thead tr');
     
-    if (!verificationTable || !tableHeader) return;
+    if (!verificationTable || !tableHeader) {
+        console.error("Elementi tabele za verifikaciju nisu pronađeni!");
+        return;
+    }
     
     // Clear existing content
     while (tableHeader.children.length > 1) {
@@ -139,7 +156,7 @@ function buildVerificationTable(answers) {
     // Get players who submitted answers
     const playersWithAnswers = [];
     for (const playerId in answers) {
-        if (answers[playerId].isFinished) {
+        if (answers[playerId] && answers[playerId].isFinished) {
             const playerData = allPlayersData[playerId];
             if (playerData) {
                 playersWithAnswers.push({
@@ -147,12 +164,28 @@ function buildVerificationTable(answers) {
                     name: playerData.username,
                     answers: answers[playerId]
                 });
+            } else {
+                console.log("Nema podataka o igraču:", playerId);
+                // Koristi username iz odgovora ako postoji
+                if (answers[playerId].username) {
+                    playersWithAnswers.push({
+                        id: playerId,
+                        name: answers[playerId].username,
+                        answers: answers[playerId]
+                    });
+                }
             }
         }
     }
     
+    console.log("Igrači sa odgovorima:", playersWithAnswers);
+    
     // Sort players by name
-    playersWithAnswers.sort((a, b) => a.name.localeCompare(b.name));
+    try {
+        playersWithAnswers.sort((a, b) => a.name.localeCompare(b.name));
+    } catch (e) {
+        console.error("Greška pri sortiranju igrača:", e);
+    }
     
     // Add player headers
     playersWithAnswers.forEach(player => {
@@ -192,14 +225,14 @@ function buildVerificationTable(answers) {
             
             // Special handling for flags
             if (category.id === 'flag' && answerValue) {
-                const flagData = flagsData[answerValue];
+                const flagData = flagsData ? flagsData[answerValue] : null;
                 if (flagData) {
                     // Create a flag image and name
                     const flagContainer = document.createElement('div');
                     flagContainer.className = 'd-flex align-items-center';
                     
                     const flagImg = document.createElement('img');
-                    flagImg.src = `assets/flags/${answerValue.toLowerCase()}.gif`;
+                    flagImg.src = `assets/flags/${answerValue.toLowerCase()}-flag.webp`;
                     flagImg.alt = flagData.name;
                     flagImg.style.width = '30px';
                     flagImg.style.marginRight = '8px';
@@ -247,10 +280,13 @@ function buildVerificationTable(answers) {
         
         verificationTable.appendChild(row);
     });
+    
+    console.log("Tabela za verifikaciju izgrađena.");
 }
 
 // Confirm verification and calculate scores
 function confirmVerification() {
+    console.log("Potvrda verifikacije...");
     if (Object.keys(verificationData).length === 0) {
         alert('Nema podataka za verifikaciju.');
         return;
@@ -265,6 +301,7 @@ function confirmVerification() {
         verifiedAt: firebase.database.ServerValue.TIMESTAMP,
         ...verificationData
     }).then(() => {
+        console.log("Verifikacija uspešno sačuvana!");
         // Calculate and save scores
         calculateScores();
     }).catch(error => {
@@ -275,6 +312,7 @@ function confirmVerification() {
 
 // Calculate scores based on verification
 function calculateScores() {
+    console.log("Računanje bodova...");
     const scoresRef = firebase.database().ref(`games/${gameData.id}/rounds/${currentRound}/scores`);
     const playerScores = {};
     
@@ -295,8 +333,11 @@ function calculateScores() {
         updatePlayerTotalScore(playerId, playerScore);
     }
     
+    console.log("Izračunati bodovi:", playerScores);
+    
     // Save round scores
     scoresRef.set(playerScores).then(() => {
+        console.log("Bodovi uspešno sačuvani, redirekcija na rezultate...");
         // Redirect to results page
         window.location.href = `round-results.html?gameId=${gameData.id}&round=${currentRound}`;
     }).catch(error => {
