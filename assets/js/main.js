@@ -279,7 +279,7 @@ function startGame() {
     createNewRound(currentGameId, 1);
     
     // Redirect to game page
-    window.location.href = 'game.html?gameId=' + currentGameId;
+    window.location.href = 'game-play.html?gameId=' + currentGameId;
 }
 
 // Create a new round
