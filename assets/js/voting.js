@@ -3,7 +3,7 @@
 
 // Game variables
 let gameData = null;
-let currentUser = null;
+let votingUser = null;
 let currentPlayerId = null;
 let roundData = null;
 let currentRound = 1;
@@ -39,8 +39,8 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
     
-    currentUser = JSON.parse(userJSON);
-    console.log("Korisnik za glasanje:", currentUser.username);
+    votingDatatUser = JSON.parse(userJSON);
+    console.log("Korisnik za glasanje:", votingDataUser.username);
     
     // Update round number display
     document.getElementById('roundNumber').textContent = currentRound;
@@ -98,7 +98,7 @@ function loadGameData(gameId) {
         // Set currentPlayerId based on username
         if (gameData.players) {
             for (const pid in gameData.players) {
-                if (gameData.players[pid].username === currentUser.username) {
+                if (gameData.players[pid].username === votingUser.username) {
                     currentPlayerId = pid;
                     console.log("Set currentPlayerId:", currentPlayerId);
                     break;
