@@ -580,3 +580,81 @@ h1, h2, h3, h4, h5, h6 {
         margin-left: 5px !important;
     }
 }
+/* Add these styles to your assets/css/style.css file */
+
+/* Voting Table Styles */
+.voting-table th,
+.voting-table td {
+    vertical-align: middle;
+    padding: 8px 12px;
+    position: relative;
+}
+
+/* Checkbox alignment */
+.voting-checkbox {
+    vertical-align: middle !important;
+    margin-left: 10px !important;
+    margin-right: 5px !important;
+    display: inline-block !important;
+    position: relative;
+    top: -1px;
+}
+
+/* Answer text and flag alignment */
+.answer-content {
+    display: inline-block;
+    vertical-align: middle;
+    margin-right: 8px;
+}
+
+/* Flag container */
+.flag-answer-container {
+    display: flex !important;
+    align-items: center;
+    white-space: nowrap;
+}
+
+.flag-answer-container img {
+    margin-right: 8px;
+}
+
+/* Waiting animation */
+.spinner-border.text-neon {
+    color: var(--accent-teal);
+    border-width: 0.25em;
+}
+
+/* Voting status updates */
+.voting-progress {
+    margin-top: 20px;
+    padding: 15px;
+    border-radius: 10px;
+    background-color: rgba(0, 255, 204, 0.1);
+    border: 1px solid var(--accent-teal);
+}
+
+.voting-progress .progress {
+    height: 10px;
+    background-color: var(--bg-darker);
+    margin-top: 8px;
+}
+
+.voting-progress .progress-bar {
+    background-color: var(--accent-teal);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .voting-table {
+        font-size: 0.9rem;
+    }
+    
+    .voting-table th,
+    .voting-table td {
+        padding: 6px 8px;
+    }
+    
+    .voting-checkbox {
+        margin-left: 5px !important;
+    }
+}
