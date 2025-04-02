@@ -291,6 +291,13 @@ function goToNextRound() {
     console.log("Going to next round...");
     console.log("Current round:", currentRound, "Total rounds:", totalRounds);
     
+    // Disable button to prevent multiple clicks
+    const nextRoundBtn = document.getElementById('nextRoundBtn');
+    if (nextRoundBtn) {
+        nextRoundBtn.disabled = true;
+        nextRoundBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Učitavanje...';
+    }
+    
     // Check if this was the last round
     if (currentRound >= totalRounds) {
         console.log("This was the last round, going to final results");
@@ -298,27 +305,107 @@ function goToNextRound() {
         return;
     }
     
-    // Only creator should create next round
+    // Calculate next round number
     const nextRound = currentRound + 1;
     console.log("Going to next round:", nextRound);
     
+    // Only creator should create next round
     if (isCreator) {
         console.log("I'm the creator, creating next round");
+        
+        // Show creating round message
+        showMessage("Kreiranje nove runde...");
+        
         // Create next round
-        createNextRound(gameData.id, nextRound)
+        createNewRound(gameData.id, nextRound)
             .then(() => {
                 console.log("Next round created, redirecting to game-play.html");
+                
+                // Also need to reset all players' isFinished status
+                return resetPlayerStatus(gameData.id);
+            })
+            .then(() => {
                 // Go to game page
                 window.location.href = `game-play.html?gameId=${gameData.id}`;
             })
             .catch(error => {
                 console.error('Error creating next round:', error);
                 alert('Došlo je do greške pri kreiranju sledeće runde.');
+                
+                // Re-enable button
+                if (nextRoundBtn) {
+                    nextRoundBtn.disabled = false;
+                    nextRoundBtn.innerHTML = '<i class="fas fa-arrow-right me-2"></i>Sledeća runda';
+                }
             });
     } else {
         // Non-creators just go to the game page
         console.log("I'm not the creator, just going to game-play.html");
-        window.location.href = `game-play.html?gameId=${gameData.id}`;
+        
+        // Show waiting message
+        showMessage("Čekanje na kreiranje nove runde...");
+        
+        // Set up a listener to check when the next round is created
+        firebase.database().ref(`games/${gameData.id}/rounds/${nextRound}`).on('value', (snapshot) => {
+            if (snapshot.exists()) {
+                console.log("Next round has been created, redirecting to game-play.html");
+                window.location.href = `game-play.html?gameId=${gameData.id}`;
+            }
+        });
+        
+        // Set a timeout in case the creator disconnects or something goes wrong
+        setTimeout(() => {
+            console.log("Timeout reached, redirecting to game-play.html anyway");
+            window.location.href = `game-play.html?gameId=${gameData.id}`;
+        }, 10000); // 10 seconds timeout
+    }
+}
+
+// Reset player status for new round
+function resetPlayerStatus(gameId) {
+    console.log("Resetting player status for new round");
+    
+    const updates = {};
+    
+    // Reset isFinished for all players
+    for (const playerId in allPlayersData) {
+        updates[`games/${gameId}/players/${playerId}/isFinished`] = false;
+    }
+    
+    return firebase.database().ref().update(updates);
+}
+
+// Show message
+function showMessage(message) {
+    // Create or get message container
+    let messageContainer = document.getElementById('messageContainer');
+    
+    if (!messageContainer) {
+        messageContainer = document.createElement('div');
+        messageContainer.id = 'messageContainer';
+        messageContainer.className = 'message-container';
+        
+        const messageContent = document.createElement('div');
+        messageContent.className = 'message-content bg-dark-secondary p-3 rounded shadow-neon text-center';
+        
+        const messageText = document.createElement('p');
+        messageText.className = 'text-light mb-2';
+        messageText.id = 'messageText';
+        messageText.textContent = message;
+        
+        const spinner = document.createElement('div');
+        spinner.className = 'spinner-border text-neon';
+        spinner.setAttribute('role', 'status');
+        spinner.innerHTML = '<span class="visually-hidden">Loading...</span>';
+        
+        messageContent.appendChild(messageText);
+        messageContent.appendChild(spinner);
+        messageContainer.appendChild(messageContent);
+        
+        document.body.appendChild(messageContainer);
+    } else {
+        document.getElementById('messageText').textContent = message;
+        messageContainer.style.display = 'flex';
     }
 }
 

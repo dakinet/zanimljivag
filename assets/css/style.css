@@ -658,3 +658,145 @@ h1, h2, h3, h4, h5, h6 {
         margin-left: 5px !important;
     }
 }
+/* Add these styles to your assets/css/style.css file */
+
+/* Waiting overlay */
+.waiting-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+.waiting-content {
+    max-width: 80%;
+    width: 400px;
+    padding: 30px;
+    border: 1px solid var(--accent-teal);
+    box-shadow: 0 0 20px rgba(0, 255, 204, 0.3);
+}
+
+/* Loading overlay */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+.loading-content {
+    max-width: 80%;
+    width: 400px;
+}
+
+/* Spinner styling */
+.spinner-border.text-neon {
+    color: var(--accent-teal);
+    border-width: 0.25em;
+}
+
+/* Message container */
+.message-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+.message-content {
+    max-width: 80%;
+    width: 400px;
+    padding: 20px;
+    border: 1px solid var(--accent-teal);
+    box-shadow: 0 0 20px rgba(0, 255, 204, 0.3);
+}
+
+/* Waiting indicator in game */
+.waiting-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 80px;
+    width: 80px;
+    background: linear-gradient(135deg, var(--accent-purple) 0%, var(--accent-teal) 100%);
+    border-radius: 50%;
+    color: white;
+    font-size: 0.9rem;
+    text-align: center;
+    box-shadow: 0 0 15px rgba(0, 255, 204, 0.5);
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(0, 255, 204, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(0, 255, 204, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(0, 255, 204, 0);
+    }
+}
+
+/* Additional info section for voting page */
+.game-info-bar {
+    background-color: var(--bg-darker);
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.game-info-item {
+    display: flex;
+    align-items: center;
+    margin: 5px 10px;
+    color: var(--text-light);
+}
+
+.game-info-item i {
+    margin-right: 8px;
+    color: var(--accent-teal);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .waiting-content,
+    .loading-content,
+    .message-content {
+        width: 90%;
+        padding: 20px;
+    }
+    
+    .game-info-bar {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .game-info-item {
+        margin: 5px 0;
+    }
+}

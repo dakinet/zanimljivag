@@ -153,9 +153,20 @@ function checkVerifierStatus() {
         const verifierPlayerId = roundData.verification.verifiedBy;
         
         if (verifierPlayerId !== currentPlayerId) {
-            console.log("This user is not the designated verifier, redirecting to results");
-            // Redirect to results page
-            window.location.href = `round-results.html?gameId=${gameData.id}&round=${currentRound}`;
+            console.log("This user is not the designated verifier");
+            // Instead of redirecting, show a message that they're waiting for verification
+            document.getElementById('verificationContainer').innerHTML = `
+                <div class="text-center">
+                    <h3 class="text-light mb-4">Čekanje na verifikaciju odgovora</h3>
+                    <p class="text-light">Igrač ${getVerifierUsername(verifierPlayerId)} verifikuje odgovore...</p>
+                    <div class="spinner-border text-neon mt-3" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            `;
+            
+            // Listen for when verification is complete
+            listenForVerificationComplete();
             return;
         }
     } else {
@@ -188,7 +199,19 @@ function checkVerifierStatus() {
             
             if (firstPlayer.id !== currentPlayerId) {
                 console.log("Not the first player, should not be verifying");
-                window.location.href = `round-results.html?gameId=${gameData.id}&round=${currentRound}`;
+                // Instead of redirecting, show waiting message
+                document.getElementById('verificationContainer').innerHTML = `
+                    <div class="text-center">
+                        <h3 class="text-light mb-4">Čekanje na verifikaciju odgovora</h3>
+                        <p class="text-light">Igrač ${firstPlayer.username} verifikuje odgovore...</p>
+                        <div class="spinner-border text-neon mt-3" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                `;
+                
+                // Listen for when verification is complete
+                listenForVerificationComplete();
                 return;
             } else {
                 // I am the first player, set myself as verifier if not already set
@@ -211,6 +234,32 @@ function checkVerifierStatus() {
     // Load initial answers
     loadAnswersForVerification();
 }
+
+// Helper function to get verifier's username
+function getVerifierUsername(verifierId) {
+    // Try to find username in allPlayersData
+    if (allPlayersData[verifierId]) {
+        return allPlayersData[verifierId].username || "Nepoznat igrač";
+    }
+    
+    // If not found, try to find in roundData.answers
+    if (roundData && roundData.answers && roundData.answers[verifierId]) {
+        return roundData.answers[verifierId].username || "Nepoznat igrač";
+    }
+    
+    return "Nepoznat igrač";
+}
+
+// Listen for when verification is complete
+function listenForVerificationComplete() {
+    firebase.database().ref(`games/${gameData.id}/rounds/${currentRound}/verification/verifiedAt`).on('value', (snapshot) => {
+        if (snapshot.exists() && snapshot.val()) {
+            console.log("Verification completed, redirecting to results");
+            window.location.href = `round-results.html?gameId=${gameData.id}&round=${currentRound}`;
+        }
+    });
+}
+
 
 // Setup a listener for new answers
 function setupAnswersListener(gameId) {
@@ -465,6 +514,13 @@ function confirmVerification() {
         return;
     }
     
+    // Disable button to prevent multiple clicks
+    const confirmButton = document.getElementById('confirmVerificationBtn');
+    if (confirmButton) {
+        confirmButton.disabled = true;
+        confirmButton.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Obrađivanje...';
+    }
+    
     // Reference to verification data in Firebase
     const verificationRef = firebase.database().ref(`games/${gameData.id}/rounds/${currentRound}/verification`);
     
@@ -476,33 +532,80 @@ function confirmVerification() {
     }).then(() => {
         console.log("Verifikacija uspešno sačuvana!");
         
-        // Check if round is finished
+        // Show success message
+        showToast("Verifikacija uspešno sačuvana!");
+        
+        // Check if round is finished (timer expired)
         return firebase.database().ref(`games/${gameData.id}/rounds/${currentRound}/finishedAt`).once('value');
     })
     .then((snapshot) => {
         const isFinished = snapshot.exists() && snapshot.val();
         
         if (isFinished) {
-            // Round is finished, calculate scores and go to results
-            calculateScores();
+            // Round is finished, redirect to voting page
+            redirectToVotingPage();
         } else {
-            // Round not finished yet, show message and disable button
-            const confirmButton = document.getElementById('confirmVerificationBtn');
-            if (confirmButton) {
-                confirmButton.disabled = true;
-                confirmButton.textContent = "Sačekaj da svi igrači završe...";
-            }
+            // Round not finished yet, show waiting message
+            showWaitingForEndOfRound();
             
-            showToast("Verifikacija sačuvana. Sačekaj da svi igrači završe ili da istekne vreme!");
-            
-            // Set up a listener for round finished status
-            listenForRoundFinished();
+            // Set up listener for round end
+            listenForRoundEnd();
         }
     })
     .catch(error => {
         console.error('Error saving verification:', error);
         alert('Došlo je do greške pri čuvanju verifikacije.');
+        
+        // Re-enable button
+        if (confirmButton) {
+            confirmButton.disabled = false;
+            confirmButton.innerHTML = '<i class="fas fa-check-circle me-2"></i>Potvrdi i boduj';
+        }
     });
+}
+
+function redirectToVotingPage() {
+    console.log("Redirecting to voting page");
+    window.location.href = `voting.html?gameId=${gameData.id}&round=${currentRound}`;
+}
+
+function listenForRoundEnd() {
+    firebase.database().ref(`games/${gameData.id}/rounds/${currentRound}/finishedAt`).on('value', (snapshot) => {
+        if (snapshot.exists() && snapshot.val()) {
+            console.log("Round has ended, redirecting to voting page");
+            redirectToVotingPage();
+        }
+    });
+}
+
+function showWaitingForEndOfRound() {
+    // Create or update waiting overlay
+    let waitingOverlay = document.getElementById('waitingOverlay');
+    if (!waitingOverlay) {
+        waitingOverlay = document.createElement('div');
+        waitingOverlay.id = 'waitingOverlay';
+        waitingOverlay.className = 'waiting-overlay';
+        
+        waitingOverlay.innerHTML = `
+            <div class="waiting-content bg-dark-secondary p-4 rounded shadow-neon text-center">
+                <h3 class="text-light mb-3">Verifikacija završena</h3>
+                <p class="text-light mb-4">Čekanje na završetak runde za ostale igrače...</p>
+                <div class="d-flex justify-content-center align-items-center gap-3">
+                    <div class="spinner-border text-neon" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <div id="waitingCounter" class="text-neon fs-4">
+                        Čekanje...
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(waitingOverlay);
+    } else {
+        // Update existing overlay
+        waitingOverlay.style.display = 'flex';
+    }
 }
 
 // Listen for round finished status

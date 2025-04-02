@@ -26,6 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     if (!gameId) {
         // No game ID, redirect to home
+        alert('Nedostaje ID igre.');
         window.location.href = 'index.html';
         return;
     }
@@ -35,15 +36,16 @@ document.addEventListener('DOMContentLoaded', () => {
     
     if (!userJSON) {
         // No user, redirect to home
+        alert('Niste prijavljeni.');
         window.location.href = 'index.html';
         return;
     }
     
-    votingDatatUser = JSON.parse(userJSON);
-    console.log("Korisnik za glasanje:", votingDataUser.username);
+    currentUser = JSON.parse(userJSON);
+    console.log("Korisnik za glasanje:", currentUser.username);
     
-    // Update round number display
-    document.getElementById('roundNumber').textContent = currentRound;
+    // Show loading indicator
+    showLoadingIndicator("Učitavanje podataka...");
     
     // Setup event listeners
     setupEventListeners();
@@ -51,6 +53,32 @@ document.addEventListener('DOMContentLoaded', () => {
     // Load game data
     loadGameData(gameId);
 });
+
+function showLoadingIndicator(message) {
+    const loadingOverlay = document.createElement('div');
+    loadingOverlay.id = 'loadingOverlay';
+    loadingOverlay.className = 'loading-overlay';
+    
+    loadingOverlay.innerHTML = `
+        <div class="loading-content bg-dark-secondary p-4 rounded shadow-neon text-center">
+            <h3 class="text-light mb-3">Molimo sačekajte</h3>
+            <p class="text-light mb-4">${message}</p>
+            <div class="spinner-border text-neon" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(loadingOverlay);
+}
+
+// Hide loading indicator
+function hideLoadingIndicator() {
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    if (loadingOverlay) {
+        loadingOverlay.remove();
+    }
+}
 
 // Generate player ID
 function generatePlayerId(username) {
@@ -85,6 +113,7 @@ function loadGameData(gameId) {
     gameRef.once('value', (snapshot) => {
         if (!snapshot.exists()) {
             // Game doesn't exist, redirect to home
+            hideLoadingIndicator();
             alert('Igra sa tim kodom ne postoji.');
             window.location.href = 'index.html';
             return;
@@ -98,7 +127,7 @@ function loadGameData(gameId) {
         // Set currentPlayerId based on username
         if (gameData.players) {
             for (const pid in gameData.players) {
-                if (gameData.players[pid].username === votingUser.username) {
+                if (gameData.players[pid].username === currentUser.username) {
                     currentPlayerId = pid;
                     console.log("Set currentPlayerId:", currentPlayerId);
                     break;
@@ -106,25 +135,37 @@ function loadGameData(gameId) {
             }
         }
         
+        // If player ID still not found, create one
+        if (!currentPlayerId) {
+            currentPlayerId = generatePlayerId(currentUser.username);
+            console.log("Generated currentPlayerId:", currentPlayerId);
+        }
+        
         // Get game settings
-        const settings = gameData.settings;
+        const settings = gameData.settings || {};
         if (settings) {
-            totalRounds = settings.totalRounds;
+            totalRounds = settings.totalRounds || 5;
             
             // Update UI
             document.getElementById('totalRounds').textContent = totalRounds;
+            
+            // Update game info in UI
+            updateGameInfo(settings);
         }
         
         // Get round data
         if (gameData.rounds && gameData.rounds[currentRound]) {
             roundData = gameData.rounds[currentRound];
-            currentLetter = roundData.letter;
+            currentLetter = roundData.letter || 'A';
             
             // Update UI
             document.getElementById('currentLetter').textContent = currentLetter;
             
             // Get all players
             allPlayersData = gameData.players || {};
+            
+            // Hide loading indicator
+            hideLoadingIndicator();
             
             // Check if player has already voted
             checkIfAlreadyVoted();
@@ -134,36 +175,75 @@ function loadGameData(gameId) {
         } else {
             // Round doesn't exist
             console.error("Runda ne postoji u podacima igre!");
+            hideLoadingIndicator();
             alert('Runda ne postoji.');
             window.location.href = 'index.html';
         }
     }).catch(error => {
         console.error('Error loading game:', error);
+        hideLoadingIndicator();
         alert('Došlo je do greške pri učitavanju igre.');
     });
 }
 
+// Update game info in UI
+function updateGameInfo(settings) {
+    // Update round info
+    const roundInfoElement = document.getElementById('roundInfo');
+    if (roundInfoElement) {
+        roundInfoElement.textContent = `Runda ${currentRound}/${totalRounds}`;
+    }
+    
+    // Update letter
+    const letterElement = document.getElementById('currentLetter');
+    if (letterElement && currentLetter) {
+        letterElement.textContent = currentLetter;
+    }
+    
+    // Update creator if available
+    const creatorElement = document.getElementById('creatorInfo');
+    if (creatorElement && settings.createdBy) {
+        creatorElement.textContent = `Kreator: ${settings.createdBy}`;
+    }
+    
+    // Update player count
+    const playerCountElement = document.getElementById('playerCountInfo');
+    if (playerCountElement && allPlayersData) {
+        const playerCount = Object.keys(allPlayersData).length;
+        playerCountElement.textContent = `Igrači: ${playerCount}`;
+    }
+}
+
 // Check if the current player has already voted
 function checkIfAlreadyVoted() {
-    if (!roundData.votes || !roundData.votes[currentPlayerId]) {
-        // Player hasn't voted yet, load answers for voting
-        loadAnswersForVoting();
-    } else {
-        console.log("Player has already voted, waiting for others");
-        // Show waiting message and disable voting
-        document.getElementById('votingContainer').innerHTML = `
-            <div class="text-center">
-                <h3 class="text-light mb-4">Već ste glasali!</h3>
-                <p class="text-light">Čekanje na ostale igrače da završe glasanje...</p>
-                <div class="spinner-border text-neon mt-3" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-            </div>
-        `;
-        
-        // Check if all votes are in
-        checkAllVotesSubmitted();
+    // First make sure the votes node exists
+    if (!roundData.votes) {
+        // No votes yet, initialize the votes for this round
+        firebase.database().ref(`games/${gameData.id}/rounds/${currentRound}/votes`).set({});
     }
+    
+    // Check if player has already voted
+    firebase.database().ref(`games/${gameData.id}/rounds/${currentRound}/votes/${currentPlayerId}`).once('value', (snapshot) => {
+        if (snapshot.exists() && snapshot.val()) {
+            console.log("Player has already voted, waiting for others");
+            // Show waiting message and disable voting
+            document.getElementById('votingContainer').innerHTML = `
+                <div class="text-center">
+                    <h3 class="text-light mb-4">Već ste glasali!</h3>
+                    <p class="text-light">Čekanje na ostale igrače da završe glasanje...</p>
+                    <div class="spinner-border text-neon mt-3" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            `;
+            
+            // Check if all votes are in
+            checkAllVotesSubmitted();
+        } else {
+            // Player hasn't voted yet, load answers for voting
+            loadAnswersForVoting();
+        }
+    });
 }
 
 // Setup a listener for new votes

@@ -265,24 +265,24 @@ function handleRoundFinished(roundData) {
         // But still check if we need to redirect
         if (document.location.pathname.includes('game-play.html')) {
             console.log("Already finished but still on game page, forcing redirect");
-            redirectToVotingPage();
+            redirectToVerifyPage();
         }
         return;
     }
     
     isRoundFinished = true;
-    console.log("Runda je završena, prelazak na glasanje");
+    console.log("Runda je završena, prelazak na verifikaciju");
     
-    // Function to redirect to voting page
-    function redirectToVotingPage() {
+    // Function to redirect to verify page
+    function redirectToVerifyPage() {
         // Force an additional check for finishedAt timestamp after submission
         const roundRef = firebase.database().ref(`games/${gameData.id}/rounds/${currentRound}`);
         
         // Check if the round has officially ended (timer expired)
         roundRef.child('finishedAt').once('value', (snapshot) => {
             if (snapshot.exists() && snapshot.val()) {
-                console.log("Round has officially ended, redirecting to voting page");
-                redirectWithDelay('voting.html?gameId=' + gameData.id + '&round=' + currentRound, 500);
+                console.log("Round has officially ended, redirecting to verify page");
+                redirectWithDelay('verify.html?gameId=' + gameData.id + '&round=' + currentRound, 500);
             } else {
                 // If current player finished early but round still going, just disable inputs
                 console.log("Player finished but round still going, waiting for round to end");
@@ -292,8 +292,8 @@ function handleRoundFinished(roundData) {
                 // Set up a listener for round end
                 roundRef.child('finishedAt').on('value', (snapshot) => {
                     if (snapshot.exists() && snapshot.val()) {
-                        console.log("Round has now ended, redirecting to voting page");
-                        redirectWithDelay('voting.html?gameId=' + gameData.id + '&round=' + currentRound, 500);
+                        console.log("Round has now ended, redirecting to verify page");
+                        redirectWithDelay('verify.html?gameId=' + gameData.id + '&round=' + currentRound, 500);
                     }
                 });
             }
@@ -301,7 +301,7 @@ function handleRoundFinished(roundData) {
     }
     
     // Execute the redirect logic
-    redirectToVotingPage();
+    redirectToVerifyPage();
 }
 
 // Helper function for delayed redirect
@@ -570,6 +570,13 @@ function submitAnswers() {
         return; // Prevent multiple submissions
     }
     
+    // Disable the submit button immediately to prevent double clicks
+    const submitBtn = document.getElementById('submitAnswersBtn');
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Obrađivanje...';
+    }
+    
     // Get the selected flag code
     let selectedFlagCode = null;
     const selectedFlag = document.querySelector('.flag-item.selected');
@@ -596,21 +603,17 @@ function submitAnswers() {
     
     console.log("Šaljem odgovore:", answers);
     
+    // Mark as finished locally immediately
+    isRoundFinished = true;
+    
+    // Force an additional check for finishedAt timestamp after submission
+    const roundRef = firebase.database().ref(`games/${gameData.id}/rounds/${currentRound}`);
+    
     // Save answers to Firebase
     firebase.database().ref(`games/${gameData.id}/rounds/${currentRound}/answers/${currentPlayerId}`).update(answers)
         .then(() => {
             console.log("Odgovori uspešno poslati!");
             
-            // Mark player as finished in player data
-            return firebase.database().ref(`games/${gameData.id}/players/${currentPlayerId}`).update({
-                isFinished: true,
-                lastActive: firebase.database.ServerValue.TIMESTAMP
-            });
-        })
-        .then(() => {
-            console.log("Igrač označen kao završen.");
-            isRoundFinished = true; // Mark as finished locally
-
             // Disable inputs
             disableAllInputs();
             
@@ -620,15 +623,30 @@ function submitAnswers() {
             // Show submitted message
             showToast('Odgovori su uspešno poslati!');
             
+            // Mark player as finished in player data
+            return firebase.database().ref(`games/${gameData.id}/players/${currentPlayerId}`).update({
+                isFinished: true,
+                lastActive: firebase.database.ServerValue.TIMESTAMP
+            });
+        })
+        .then(() => {
+            console.log("Igrač označen kao završen.");
+            
             // Check if this player was first to finish
             checkIfFirstToFinish();
         })
         .catch(error => {
+            // Re-enable the button in case of error
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fas fa-paper-plane me-2"></i>Potvrdi odgovore';
+            }
+            
             console.error('Error submitting answers:', error);
             showToast('Došlo je do greške pri slanju odgovora. Pokušajte ponovo.');
+            isRoundFinished = false; // Reset the finished status
         });
 }
-
 function checkIfFirstToFinish() {
     console.log("Checking if first player to finish...");
     const answersRef = firebase.database().ref(`games/${gameData.id}/rounds/${currentRound}/answers`);
@@ -671,11 +689,9 @@ function checkIfFirstToFinish() {
                     console.error("Error setting verifier:", error);
                 });
             } else {
-                console.log("Not the first player, waiting for round to end");
-                showToast("Waiting for round to end...");
-                
-                // Listen for round finished status
-                setupRoundFinishedListener();
+                // Even if not the first player, still redirect to verify page
+                console.log("Not the first player, but still redirecting to verify page");
+                redirectWithDelay('verify.html?gameId=' + gameData.id + '&round=' + currentRound, 500);
             }
         }
     });
@@ -685,6 +701,18 @@ function checkIfFirstToFinish() {
 function handleTimerExpired() {
     console.log("Timer expired, forcing round completion");
     
+    // Stop the timer visually
+    const timerElement = document.getElementById('timer');
+    if (timerElement) {
+        timerElement.textContent = "0:00";
+        timerElement.style.color = 'red';
+    }
+    
+    // If player hasn't submitted answers yet, do it now
+    if (!isRoundFinished) {
+        submitAnswers();
+    }
+    
     // Check if the round is already marked as finished
     firebase.database().ref(`games/${gameData.id}/rounds/${currentRound}/finishedAt`).once('value', (snapshot) => {
         if (!snapshot.exists() || !snapshot.val()) {
@@ -692,19 +720,7 @@ function handleTimerExpired() {
             firebase.database().ref(`games/${gameData.id}/rounds/${currentRound}/finishedAt`).set(firebase.database.ServerValue.TIMESTAMP)
                 .then(() => {
                     console.log("Round marked as finished");
-                    
-                    // If this player hasn't submitted answers yet, auto-submit
-                    if (!isRoundFinished) {
-                        submitAnswers();
-                    } else {
-                        // Already finished, redirect to voting page
-                        redirectWithDelay('voting.html?gameId=' + gameData.id + '&round=' + currentRound, 500);
-                    }
                 });
-        } else {
-            console.log("Round already marked as finished");
-            // Redirect to voting page
-            redirectWithDelay('voting.html?gameId=' + gameData.id + '&round=' + currentRound, 500);
         }
     });
 }
@@ -733,10 +749,82 @@ function setupRoundFinishedListener() {
     
     firebase.database().ref(`games/${gameData.id}/rounds/${currentRound}/finishedAt`).on('value', (snapshot) => {
         if (snapshot.exists() && snapshot.val()) {
-            console.log("Round is now finished, redirecting to results");
-            redirectWithDelay('round-results.html?gameId=' + gameData.id + '&round=' + currentRound, 500);
+            console.log("Round is now finished, redirecting to verify page");
+            redirectWithDelay('verify.html?gameId=' + gameData.id + '&round=' + currentRound, 500);
         }
     });
+}
+    
+    // Listen for round finish
+    firebase.database().ref(`games/${gameData.id}/rounds/${currentRound}/finishedAt`).on('value', (snapshot) => {
+        if (snapshot.exists() && snapshot.val()) {
+            console.log("Round is now finished, redirecting to voting");
+            clearInterval(timerInterval); // Now we can clear the interval
+            
+            // Check if verification is already in progress
+            firebase.database().ref(`games/${gameData.id}/rounds/${currentRound}/verification/verifiedBy`).once('value', (verifierSnapshot) => {
+                const verifierId = verifierSnapshot.val();
+                
+                if (verifierId) {
+                    // Check if the verification is complete
+                    firebase.database().ref(`games/${gameData.id}/rounds/${currentRound}/verification/verifiedAt`).once('value', (verifiedAtSnapshot) => {
+                        if (verifiedAtSnapshot.exists() && verifiedAtSnapshot.val()) {
+                            // Verification complete, check if scores exist
+                            firebase.database().ref(`games/${gameData.id}/rounds/${currentRound}/scores`).once('value', (scoresSnapshot) => {
+                                if (scoresSnapshot.exists() && scoresSnapshot.val()) {
+                                    // Scores exist, go to results
+                                    redirectWithDelay('round-results.html?gameId=' + gameData.id + '&round=' + currentRound, 500);
+                                } else {
+                                    // Verification complete but no scores, go to voting
+                                    redirectWithDelay('voting.html?gameId=' + gameData.id + '&round=' + currentRound, 500);
+                                }
+                            });
+                        } else {
+                            // Verification in progress but not complete, show waiting screen
+                            showWaitingScreen("Čekanje na verifikaciju odgovora...");
+                            
+                            // Set up listener for verification completion
+                            firebase.database().ref(`games/${gameData.id}/rounds/${currentRound}/verification/verifiedAt`).on('value', (verifiedAtSnapshot) => {
+                                if (verifiedAtSnapshot.exists() && verifiedAtSnapshot.val()) {
+                                    // Verification now complete, go to voting
+                                    redirectWithDelay('voting.html?gameId=' + gameData.id + '&round=' + currentRound, 500);
+                                }
+                            });
+                        }
+                    });
+                } else {
+                    // No verifier yet, go to voting directly
+                    redirectWithDelay('voting.html?gameId=' + gameData.id + '&round=' + currentRound, 500);
+                }
+            });
+        }
+    });
+}
+
+function showWaitingScreen(message) {
+    // Create waiting overlay if it doesn't exist
+    let waitingOverlay = document.getElementById('waitingOverlay');
+    if (!waitingOverlay) {
+        waitingOverlay = document.createElement('div');
+        waitingOverlay.id = 'waitingOverlay';
+        waitingOverlay.className = 'waiting-overlay';
+        
+        waitingOverlay.innerHTML = `
+            <div class="waiting-content bg-dark-secondary p-4 rounded shadow-neon text-center">
+                <h3 class="text-light mb-3">Molimo sačekajte</h3>
+                <p id="waitingMessage" class="text-light mb-4">${message}</p>
+                <div class="spinner-border text-neon" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(waitingOverlay);
+    } else {
+        // Update existing overlay
+        document.getElementById('waitingMessage').textContent = message;
+        waitingOverlay.style.display = 'flex';
+    }
 }
 
 // Disable all inputs after submission
